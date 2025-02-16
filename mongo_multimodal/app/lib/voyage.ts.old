@@ -1,0 +1,57 @@
+import { VoyageAIClient, VoyageAI } from 'voyageai';
+
+if (!process.env.VOYAGE_API_KEY) {
+  throw new Error('Please add your Voyage API key to .env.local');
+}
+
+const voyageClient = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY });
+
+export async function generateEmbedding(input: string, isQuery: boolean = false) {
+  try {
+    const response = await voyageClient.embed({
+      model: 'voyage-multimodal-3',
+      input: [input],
+      inputType: isQuery ? 'query' : 'document'
+    });
+
+    if (!response.data || response.data.length === 0) {
+      throw new Error('No embedding generated');
+    }
+    return response.data[0];
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    throw error;
+  }
+}
+
+export async function generateMultimodalEmbedding(
+  content: { text?: string; base64?: string },
+  isQuery: boolean = false
+) {
+  try {
+    const inputs: string[] = [];
+
+    if (content.text) {
+      inputs.push(content.text);
+    }
+
+    if (content.base64) {
+      // For images, we need to send the base64 string directly
+      inputs.push(`data:image/jpeg;base64,${content.base64}`);
+    }
+
+    const response = await voyageClient.embed({
+      model: 'voyage-multimodal-3',
+      input: inputs,
+      inputType: isQuery ? 'query' : 'document'
+    });
+
+    if (!response.data || response.data.length === 0) {
+      throw new Error('No embedding generated');
+    }
+    return response.data[0];
+  } catch (error) {
+    console.error('Error generating multimodal embedding:', error);
+    throw error;
+  }
+}

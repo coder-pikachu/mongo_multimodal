@@ -1,0 +1,42 @@
+{
+  "name": "mongo_multimodal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test:db": "ts-node -P app/scripts/tsconfig.json app/scripts/test-db.ts",
+    "create:index": "ts-node -P app/scripts/tsconfig.json app/scripts/create-vector-index.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.3.4",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tanstack/react-query": "^5.18.1",
+    "autoprefixer": "^10.4.20",
+    "date-fns": "^3.3.1",
+    "dotenv": "^16.4.7",
+    "lucide-react": "^0.475.0",
+    "mongodb": "^6.3.0",
+    "next": "15.1.7",
+    "next-themes": "^0.4.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.50.1",
+    "voyageai": "^0.0.3-1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.1.7",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5"
+  }
+}

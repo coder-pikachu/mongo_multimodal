@@ -3,7 +3,9 @@ import { ClientProject, ClientProjectData } from '@/types/clientTypes';
 import ProjectPageClient from './components/ProjectPageClient';
 
 async function getProject(projectId: string): Promise<Project | null> {
-  const baseUrl = 'http://localhost:3000';
+  const baseUrl = process.env.VERCEL_URL
+    ? `http://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000';
 
   try {
     const response = await fetch(`${baseUrl}/api/projects/${projectId}`, {
@@ -31,7 +33,9 @@ async function getProject(projectId: string): Promise<Project | null> {
 }
 
 async function getProjectData(projectId: string): Promise<ProjectData[]> {
-  const baseUrl = 'http://localhost:3000';
+  const baseUrl = process.env.VERCEL_URL
+    ? `http://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000';
 
   try {
     const response = await fetch(`${baseUrl}/api/projects/${projectId}/data`, {

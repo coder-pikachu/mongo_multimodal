@@ -8,7 +8,7 @@ export async function GET() {
     const projects = await db.collection('projects').find().toArray();
     return NextResponse.json(projects);
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
+    return NextResponse.json({ error: `Failed to fetch projects ${error}` }, { status: 500 });
   }
 }
 
@@ -27,6 +27,6 @@ export async function POST(request: NextRequest) {
     const result = await db.collection('projects').insertOne(project);
     return NextResponse.json({ id: result.insertedId });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
+    return NextResponse.json({ error: `Failed to create project ${error}` }, { status: 500 });
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { ClientProjectData } from '@/types/clientTypes';
 
 import { formatDate } from '@/lib/clientUtils';
@@ -12,7 +12,7 @@ interface DataListProps {
   projectId: string;
 }
 
-export default function DataList({ data, projectId }: DataListProps) {
+export default function DataList({ data }: DataListProps) {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -40,24 +40,29 @@ export default function DataList({ data, projectId }: DataListProps) {
     try {
       setIsProcessing(true);
       const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
+        ? `http://${process.env.VERCEL_URL}`
         : 'http://localhost:3000';
 
-      const response = await fetch(`${baseUrl}/api/projects/data/process`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ itemIds: selectedItems })
-      });
+      // For each selected item call process
+      for (const itemId of selectedItems) {
+        let successCount = 0;
+        setIsProcessing(true);
+
+        const response = await fetch(`${baseUrl}/api/projects/data/${itemId}/process`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ itemIds: selectedItems })
+        });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      setProgress(Math.round((successCount++ / selectedItems.length) * 100));
 
-      const results = await response.json();
-      const successCount = results.filter((r: { success: boolean }) => r.success).length;
-      setProgress(Math.round((successCount / selectedItems.length) * 100));
+      }
+
 
       // Refresh the page to show updated data
       window.location.reload();
@@ -159,12 +164,12 @@ export default function DataList({ data, projectId }: DataListProps) {
             <div className="mt-4 pt-4 border-t border-gray-200">
               <p className="text-sm text-gray-600">{item.analysis.description}</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {item.analysis.tags.map((tag: any, index: any) => (
+                {item.analysis.tags.map((tag: unknown, index: unknown) => (
                   <span
-                    key={index}
+                    key={index as number}
                     className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"
                   >
-                    {tag}
+                    {tag as ReactNode}
                   </span>
                 ))}
               </div>

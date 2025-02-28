@@ -4,10 +4,11 @@ import { Project } from '@/types/models';
 async function getProjects(): Promise<Project[]> {
   // Use absolute URL for server components
   const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
+    ? `http://${process.env.VERCEL_URL}`
     : 'http://localhost:3000';
 
   try {
+    console.log('Fetching projects...' + baseUrl);
     const response = await fetch(`${baseUrl}/api/projects`, {
       method: 'GET',
       headers: {

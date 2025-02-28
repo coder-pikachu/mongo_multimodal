@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Loader2 } from 'lucide-react';
 
@@ -51,13 +51,6 @@ interface Message {
   references?: ReferenceItem[];
 }
 
-interface AnalysisResult {
-  type: 'text';
-  text: string;
-}
-
-
-
 interface ChatInterfaceProps {
   projectId: string;
 }
@@ -66,6 +59,25 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const MAX_RETRIES = 3;
+
+  useEffect(() => {
+    const welcomeMessage: Message = {
+      id: 'welcome',
+      role: 'assistant',
+      content: 'Welcome to your Research Assistant! I can help you explore and analyze the documents and images in this project.\n\n' +
+        'Here\'s what you can do:\n' +
+        '• Ask questions about specific documents or images\n' +
+        '• Request analysis of visual content in your images\n' +
+        '• Find connections between different items in your project\n' +
+        '• Get summaries of technical content\n\n' +
+        'Try asking something like "What are the main topics in this project?" or "Explain the diagrams related to [specific topic]"',
+      timestamp: new Date()
+    };
+    setMessages([welcomeMessage]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,45 +94,78 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
     const currentInput = input;
     setInput(''); // Clear input immediately after submission
     setIsLoading(true);
+    setRetryCount(0);
+    setIsRetrying(false);
 
+    await performSearch(currentInput);
+  };
+
+  const performSearch = async (query: string, isRetry = false) => {
     try {
       const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
+        ? `http://${process.env.VERCEL_URL}`
         : 'http://localhost:3000';
+
+      if (isRetry && !isRetrying) {
+        setIsRetrying(true);
+        const thinkingMessage: Message = {
+          id: `thinking-${Date.now().toString()}`,
+          role: 'assistant',
+          content: 'I\'m still thinking about your question. This might take a moment for complex analyses...',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, thinkingMessage]);
+      }
 
       const response = await fetch(`${baseUrl}/api/projects/${projectId}/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: currentInput, type: 'text' })
+        body: JSON.stringify({ query, type: 'text' })
       });
 
-      if (!response.ok) {
-        throw new Error('Search failed');
+      if (response.status === 529) {
+        if (retryCount < MAX_RETRIES) {
+          console.log(`Search timed out, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+          setRetryCount(prev => prev + 1);
+          
+          const delay = Math.pow(2, retryCount) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          return performSearch(query, true);
+        } else {
+          throw new Error('Search timed out after multiple retries');
+        }
       }
 
-      const { results, analysis }: { results: SearchResult[], analysis: AnalysisResult[] } = await response.json();
+      if (!response.ok) {
+        throw new Error(`Search failed with status: ${response.status}`);
+      }
+
+      const { results }: { results: SearchResult[] } = await response.json();
+
+      if (isRetrying) {
+        setMessages(prev => prev.filter(msg => !msg.id.startsWith('thinking-')));
+      }
 
       if (!results || results.length === 0) {
         const noResultsMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: 'I couldn\'t find any relevant information in the project. Try rephrasing your query or uploading more content.',
+          content: 'I couldn\'t find any relevant information in the project. Try rephrasing your query, being more specific, or uploading more content related to your question.',
           timestamp: new Date()
         };
         setMessages(prev => [...prev, noResultsMessage]);
         return;
       }
 
-      // Create message with Claude's analysis and search results
       const assistantMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: analysis[0]?.text || 'I found some relevant items but couldn\'t generate a detailed analysis.',
+        content: results[0]?.analysis?.description || 'I found some relevant items but couldn\'t generate a detailed analysis.',
         timestamp: new Date(),
         references: results.map(result => {
-          // Format file size
           const size = result.metadata.size;
           const formattedSize = size < 1024
             ? `${size} B`
@@ -128,7 +173,6 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
             ? `${(size / 1024).toFixed(1)} KB`
             : `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
-          // Format date
           const date = new Date(result.createdAt);
           const formattedDate = date.toLocaleDateString('en-US', {
             year: 'numeric',
@@ -136,7 +180,6 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
             day: 'numeric'
           });
 
-          // Create reference item
           const referenceItem: ReferenceItem = {
             id: result._id,
             type: result.type,
@@ -154,26 +197,41 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
           };
 
           return referenceItem;
-
         })
       };
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Search error:', error);
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: 'Sorry, I encountered an error while searching.',
-        timestamp: new Date()
-      };
+      
+      if (isRetrying) {
+        setMessages(prev => prev.filter(msg => !msg.id.startsWith('thinking-')));
+      }
+
+      let errorMessage: Message;
+      
+      if (error instanceof Error && error.message.includes('timed out')) {
+        errorMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: 'Sorry, the analysis is taking longer than expected. This can happen with complex queries or large images. Please try again with a more specific question or a smaller image.',
+          timestamp: new Date()
+        };
+      } else {
+        errorMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: 'Sorry, I encountered an error while searching. This might be due to temporary service issues. Please try again in a moment.',
+          timestamp: new Date()
+        };
+      }
+      
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setIsRetrying(false);
     }
   };
-
-
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] sticky top-20 bg-gray-700 rounded-lg shadow-lg">
@@ -199,7 +257,7 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
 
               {message.references && message.references.length > 0 && (
                 <div className="mt-4 space-y-3">
-                  <p className="text-xs font-medium text-gray-500">Referenced Items:</p>
+                  <p className="text-xs font-medium text-gray-300">Referenced Items:</p>
                   {message.references.map((ref, idx) => (
                     <div key={idx} className="p-4 bg-gray-800 rounded-lg border border-gray-600 shadow-sm">
                       <div className="flex items-start justify-between mb-3">
@@ -230,10 +288,10 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
                               className="object-contain"
                             />
                           </div>
-                          {ref.preview && (
+                          {/* {ref.preview && (
                             <p className="text-sm text-gray-300">{ref.preview}</p>
-                          )}
-                          {ref.analysis.tags.length > 0 && (
+                          )} */}
+                          {/* {ref.analysis.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {ref.analysis.tags.map((tag, i) => (
                                 <span key={i} className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded-full">
@@ -241,8 +299,8 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
                                 </span>
                               ))}
                             </div>
-                          )}
-                          {ref.analysis.insights.length > 0 && (
+                          )} */}
+                          {/* {ref.analysis.insights.length > 0 && (
                             <div className="text-sm text-gray-300">
                               <p className="font-medium mb-1">Insights:</p>
                               <ul className="list-disc pl-4 space-y-1">
@@ -251,7 +309,7 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
                                 ))}
                               </ul>
                             </div>
-                          )}
+                          )} */}
                         </div>
                       ) : (
                         <div className="space-y-3">

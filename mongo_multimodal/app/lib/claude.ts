@@ -1,21 +1,33 @@
+interface MessageContent {
+  type: 'text' | 'image';
+  text?: string;
+  source?: {
+    type: 'base64';
+    media_type: string;
+    data: string;
+  };
+}
+
 interface ClaudeMessage {
   role: 'user' | 'assistant';
-  content: Array<{
-    type: 'text' | 'image';
-    text?: string;
-    source?: {
-      type: 'base64';
-      media_type: string;
-      data: string;
-    };
-  }>;
+  content:  MessageContent[];
 }
 
 interface ClaudeResponse {
-  content: string;
-  stop_reason: string;
-  stop_sequence: string | null;
+  id: string;
+  type: 'message';
+  role: 'assistant';
+  content: Array<{
+    type: 'text';
+    text: string;
+  }>;
   model: string;
+  stop_reason: string | null;
+  stop_sequence: string | null;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
 }
 
 export async function generateClaudeResponse(
@@ -80,6 +92,24 @@ export async function generateClaudeResponse(
   });
 
   try {
+    const requestBody = {
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 4096,
+      messages: messages.map(msg => ({
+        role: msg.role,
+        content: Array.isArray(msg.content) ? msg.content : [{ type: 'text', text: msg.content }]
+      })),
+      temperature: 0
+    };
+
+    console.log('Claude API Request:', {
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01'
+      },
+      body: requestBody
+    });
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -87,20 +117,21 @@ export async function generateClaudeResponse(
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 1024,
-        messages,
-        temperature: 0.7
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      throw new Error(`Claude API error: ${response.statusText}`);
+      const errorBody = await response.text();
+      console.error('Claude API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody
+      });
+      throw new Error(`Claude API error: ${response.status} - ${errorBody}`);
     }
 
     const result: ClaudeResponse = await response.json();
-    return result.content;
+    return result.content[0]?.text || '';
   } catch (error) {
     console.error('Error calling Claude API:', error);
     throw error;

@@ -3,12 +3,21 @@
 import Link from 'next/link';
 import { Home, Search, LogOut, FolderOpen, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 export function Navigation() {
+  const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Toggle between light and dark themes
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    if (!mounted) return;
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
   return (
@@ -17,8 +26,16 @@ export function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
+              <Image
+                src="/logo.svg"
+                alt="MongoDB Logo"
+                width={20}
+                height={20}
+                className="text-green-500"
+                style={{ filter: 'invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%)' }}
+              />&nbsp;&nbsp;&nbsp;
               <Link href="/" className="text-xl font-semibold text-zinc-900 dark:text-white">
-                VectorSearch
+              Vector Search <sub><p className="text-xs">powered by MongoDB Atlas</p></sub>
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
@@ -49,8 +66,9 @@ export function Navigation() {
             <button
               onClick={toggleTheme}
               className="p-2 text-zinc-700 dark:text-zinc-300 hover:text-zinc-500 dark:hover:text-zinc-100 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-zinc-900"
+              suppressHydrationWarning
             >
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              {mounted && (theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />)}
             </button>
             <button
               type="button"

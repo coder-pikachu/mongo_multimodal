@@ -35,8 +35,8 @@ export async function doVectorSearchAndAnalyse( type: any, query: any, db: Db, p
              }
            } : {} ),
 
-           "limit": 5,
-           "numCandidates": 5,
+           "limit": 2,
+           "numCandidates": 2,
            "path": "embedding",
            "queryVector": queryEmbedding,
 
@@ -78,7 +78,7 @@ export async function doVectorSearchAndAnalyse( type: any, query: any, db: Db, p
      ...result,
      analysis: {
        ...result.analysis,
-       description: claudeResponse[0]?.text || '',
+       description: claudeResponse || '',
        tags: result.analysis.tags || [],
        insights: result.analysis.insights || []
      }

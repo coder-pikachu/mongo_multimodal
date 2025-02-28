@@ -24,7 +24,7 @@ export async function GET(
         description: 1,
         tags: 1,
         insights: 1,
-        embedding: 1,
+        //embedding: 1,
         createdAt: 1,
         updatedAt: 1,
         processedAt: 1

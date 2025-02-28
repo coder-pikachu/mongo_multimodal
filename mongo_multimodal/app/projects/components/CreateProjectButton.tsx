@@ -16,7 +16,7 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 export default function CreateProjectButton() {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
-  
+
   const { register, handleSubmit, formState: { errors } } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
   });
@@ -28,9 +28,9 @@ export default function CreateProjectButton() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      
+
       if (!response.ok) throw new Error('Failed to create project');
-      
+
       const result = await response.json();
       router.push(`/projects/${result.id}`);
       router.refresh();
@@ -50,7 +50,7 @@ export default function CreateProjectButton() {
 
       {isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md">
+          <div className="p-6 bg-gray-700 rounded-lg w-full max-w-md">
             <h2 className="text-2xl font-bold mb-4">Create New Project</h2>
             <form onSubmit={handleSubmit(onSubmit)}>
               <div className="mb-4">

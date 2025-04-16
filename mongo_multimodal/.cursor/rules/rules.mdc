@@ -1,0 +1,143 @@
+---
+description: MongoDB Multimodal Vector Search Project Rules
+globs: 
+alwaysApply: false
+---
+MongoDB Multimodal Vector Search Project Rules
+1. Technology Stack and Dependencies
+Core Framework: Next.js 15.1.7 with App Router
+React: Version 19.0.0
+Database: MongoDB 6.3.0
+AI/ML:
+Anthropic AI SDK 0.18.0
+VoyageAI 0.0.4
+UI/UX:
+TailwindCSS 3.4.17
+Lucide React 0.475.0
+Next Themes 0.4.4
+Form Handling: React Hook Form 7.50.1
+State Management: TanStack Query 5.18.1
+Validation: Zod 3.22.4
+2. Development Environment
+Apply to rules.mdc
+Run
+# Development
+npm run dev  # Uses Turbopack for faster development
+
+# Production
+npm run build
+npm run start
+
+# Database Management
+npm run test:db      # Test database connection
+npm run create:index # Create vector indexes
+
+# Code Quality
+npm run lint        # ESLint checking
+3. Code Organization
+App Structure:
+Apply to rules.mdc
+  app/
+  ├── api/          # API routes
+  ├── components/   # Reusable components
+  ├── lib/         # Utility functions
+  ├── scripts/     # Database scripts
+  ├── types/       # TypeScript types
+  └── page.tsx     # Main pages
+4. TypeScript Configuration
+Use strict mode
+Target ES2020
+Enable all strict type checking options
+Use path aliases for imports
+Maintain comprehensive type definitions
+5. MongoDB Integration Rules
+Use official MongoDB Node.js driver
+Implement proper connection pooling
+Use environment variables for connection strings
+Implement proper error handling
+Use TypeScript interfaces for document types
+6. Vector Search Implementation
+Use VoyageAI for embeddings
+Implement proper vector index creation
+Support both text and image vectors
+Use appropriate similarity metrics
+Implement proper caching strategies
+7. API Design Guidelines
+Use Next.js API routes
+Implement proper error handling
+Use Zod for request validation
+Implement proper response types
+Use appropriate HTTP status codes
+8. UI/UX Standards
+Use TailwindCSS for styling
+Implement dark mode support
+Use Lucide React for icons
+Follow responsive design principles
+Implement proper loading states
+9. Form Handling
+Use React Hook Form
+Implement proper validation with Zod
+Use proper error messages
+Implement proper form state management
+Use appropriate form components
+10. State Management
+Use TanStack Query for server state
+Use React hooks for local state
+Implement proper caching strategies
+Use appropriate state persistence
+Implement proper error handling
+11. Environment Configuration
+Use dotenv for environment variables
+Maintain proper .env files
+Use appropriate environment validation
+Implement proper secret management
+Use appropriate environment-specific configurations
+
+13. Performance Optimization
+Use Turbopack for development
+Implement proper code splitting
+Use appropriate caching strategies
+Implement proper image optimization
+Use appropriate loading strategies
+14. Security Guidelines
+Implement proper authentication
+Use environment variables for secrets
+Implement proper input validation
+Use appropriate security headers
+Implement proper CORS policies
+15. Documentation Requirements
+Maintain comprehensive README
+Document API endpoints
+Document environment variables
+Document database schema
+Document vector search implementation
+16. Code Quality Standards
+Use ESLint for linting
+Follow Next.js best practices
+Use proper naming conventions
+Implement proper error handling
+Use appropriate comments
+17. Database Scripts
+Use ts-node for scripts
+Implement proper error handling
+Use appropriate logging
+Implement proper validation
+Use appropriate configuration
+18. Build and Deployment
+Use Next.js build system
+Implement proper environment configuration
+Use appropriate deployment strategies
+Implement proper monitoring
+Use appropriate backup strategies
+19. Accessibility Standards
+Follow WCAG 2.1 guidelines
+Implement proper ARIA attributes
+Use appropriate color contrast
+Implement proper keyboard navigation
+Use appropriate screen reader support
+20. Error Handling
+Implement proper error boundaries
+Use appropriate error logging
+Implement proper error recovery
+Use appropriate error messages
+Implement proper error reporting

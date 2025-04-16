@@ -4,7 +4,7 @@ import { Project } from '@/types/models';
 async function getProjects(): Promise<Project[]> {
   // Use absolute URL for server components
   const baseUrl = process.env.VERCEL_URL
-    ? `http://${process.env.VERCEL_URL}`
+    ? `${process.env.VERCEL_URL}`
     : 'http://localhost:3000';
 
   try {

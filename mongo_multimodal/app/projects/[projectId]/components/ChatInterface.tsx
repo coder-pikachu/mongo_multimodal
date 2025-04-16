@@ -103,7 +103,7 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
   const performSearch = async (query: string, isRetry = false) => {
     try {
       const baseUrl = process.env.VERCEL_URL
-        ? `http://${process.env.VERCEL_URL}`
+        ? `${process.env.VERCEL_URL}`
         : 'http://localhost:3000';
 
       if (isRetry && !isRetrying) {
@@ -129,10 +129,10 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
         if (retryCount < MAX_RETRIES) {
           console.log(`Search timed out, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
           setRetryCount(prev => prev + 1);
-          
+
           const delay = Math.pow(2, retryCount) * 1000;
           await new Promise(resolve => setTimeout(resolve, delay));
-          
+
           return performSearch(query, true);
         } else {
           throw new Error('Search timed out after multiple retries');
@@ -203,13 +203,13 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Search error:', error);
-      
+
       if (isRetrying) {
         setMessages(prev => prev.filter(msg => !msg.id.startsWith('thinking-')));
       }
 
       let errorMessage: Message;
-      
+
       if (error instanceof Error && error.message.includes('timed out')) {
         errorMessage = {
           id: Date.now().toString(),
@@ -225,7 +225,7 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
           timestamp: new Date()
         };
       }
-      
+
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);

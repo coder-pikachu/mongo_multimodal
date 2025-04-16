@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Search, LogOut, FolderOpen, Moon, Sun } from 'lucide-react';
+import { Home, Search, LogOut, FolderOpen, Moon, Sun, Image as ImageIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
@@ -35,7 +35,7 @@ export function Navigation() {
                 style={{ filter: 'invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%)' }}
               />&nbsp;&nbsp;&nbsp;
               <Link href="/" className="text-xl font-semibold text-zinc-900 dark:text-white">
-              Vector Search <sub><p className="text-xs">powered by MongoDB Atlas</p></sub>
+                Vector Search <sub><p className="text-xs">powered by MongoDB Atlas</p></sub>
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
@@ -59,6 +59,13 @@ export function Navigation() {
               >
                 <Search className="w-4 h-4 mr-2" />
                 Search
+              </Link>
+              <Link
+                href="/vector-search"
+                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300"
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                Vector Search
               </Link>
             </div>
           </div>

@@ -12,6 +12,60 @@ export function formatDate(date: string | Date | undefined): string {
   return dateObj.toISOString().split('T')[0];
 }
 
+export async function doVectorImageSearch(type: 'text' | 'image', query: string, db: Db) {
+  try {
+    console.log('Query:', query, type);
+
+    const queryEmbedding = await generateMultimodalEmbedding(
+      { text: type === 'text' ? query : undefined, base64: type === 'image' ? query : undefined },
+      'query'
+    );
+
+    // Perform vector search using MongoDB Atlas
+    const results = await db.collection('projectData')
+      .aggregate([
+        {
+          $vectorSearch: {
+            index: 'vector_index',
+            "path": "embedding",
+            "queryVector": queryEmbedding,
+
+            "exact": false,
+            "limit": 10,
+            "numCandidates": 10,
+          }
+        },
+        {
+          $project: {
+            _id: 1,
+            type: 1,
+            content: 1,
+            metadata: 1,
+            analysis: 1,
+            createdAt: 1,
+            score: { $meta: 'vectorSearchScore' }
+          }
+        },
+        {
+          $match: {
+            score: { $gte: 0.6 }
+          }
+        },
+        {
+          $sort: {
+            score: -1
+          }
+        }
+      ])
+      .toArray();
+
+    console.log('Results:', results);
+    return { results };
+  } catch (error) {
+    console.error('Error performing vector search:', error);
+    throw error;
+  }
+}
 
 export async function doVectorSearchAndAnalyse( type: any, query: any, db: Db, paramsFound?: { projectId: string; } )
 {

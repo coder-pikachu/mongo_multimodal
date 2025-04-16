@@ -1,54 +1,54 @@
-import { Project, ProjectData } from '@/types/models';
-import { ClientProject, ClientProjectData } from '@/types/clientTypes';
+import { notFound } from 'next/navigation';
 import ProjectPageClient from './components/ProjectPageClient';
+import { getDb } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import { ClientProject, ClientProjectData } from '@/types/clientTypes';
 
-async function getProject(projectId: string): Promise<Project | null> {
-  const baseUrl = process.env.VERCEL_URL
-    ? `http://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
-
+async function getProject(projectId: string): Promise<ClientProject | null> {
   try {
-    const response = await fetch(`${baseUrl}/api/projects/${projectId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store'
+    const db = await getDb();
+    const project = await db.collection('projects').findOne({
+      _id: new ObjectId(projectId),
     });
 
-    if (response.status === 404) {
+    if (!project) {
       return null;
     }
 
-    if (!response.ok) {
-      console.error('Error fetching project:', response.statusText);
-      return null;
-    }
-
-    return response.json();
+    return {
+      _id: project._id.toString(),
+      name: project.name,
+      description: project.description,
+      userId: project.userId?.toString() || '',
+      createdAt: project.createdAt?.toISOString(),
+      updatedAt: project.updatedAt?.toISOString(),
+    };
   } catch (error) {
     console.error('Error fetching project:', error);
     return null;
   }
 }
 
-async function getProjectData(projectId: string): Promise<ProjectData[]> {
-  const baseUrl = process.env.VERCEL_URL
-    ? `http://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
-
+async function getProjectData(projectId: string): Promise<ClientProjectData[]> {
   try {
+    // Use absolute URL for server components
+    const baseUrl = process.env.VERCEL_URL
+      ? `${process.env.VERCEL_URL}`
+      : 'http://localhost:3000';
+
+    console.log(`Fetching project data from ${baseUrl}/api/projects/${projectId}/data`);
+
     const response = await fetch(`${baseUrl}/api/projects/${projectId}/data`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
+      // Important: Don't cache this request to always get fresh data
       cache: 'no-store'
     });
 
     if (!response.ok) {
-      console.error('Error fetching project data:', response.statusText);
-      return [];
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     return response.json();
@@ -59,28 +59,20 @@ async function getProjectData(projectId: string): Promise<ProjectData[]> {
 }
 
 export default async function ProjectPage({ params }: { params: { projectId: string } }) {
-  const projectId = params.projectId;
-  const [project, data] = await Promise.all([
-    getProject(projectId),
-    getProjectData(projectId)
-  ]);
+  const projectId = (await params).projectId;
+  const project = await getProject(projectId);
 
   if (!project) {
-    return <div>Project not found</div>;
+    notFound();
   }
 
-  // Convert server types to client types
-  const clientProject: ClientProject = {
-    ...project,
-    _id: project._id.toString(),
-    userId: project.userId?.toString() || ''
-  };
+  const data = await getProjectData(projectId);
 
-  const clientData: ClientProjectData[] = data.map(item => ({
-    ...item,
-    _id: item._id.toString(),
-    projectId: item.projectId?.toString() || ''
-  }));
-
-  return <ProjectPageClient project={clientProject} data={clientData} projectId={projectId} />;
+  return (
+    <ProjectPageClient
+      project={project}
+      data={data}
+      projectId={projectId}
+    />
+  );
 }

@@ -11,6 +11,7 @@
     "create:index": "ts-node -P app/scripts/tsconfig.json app/scripts/create-vector-index.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.18.0",
     "@hookform/resolvers": "^3.3.4",
     "@tailwindcss/forms": "^0.5.10",
     "@tanstack/react-query": "^5.18.1",
@@ -24,7 +25,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.50.1",
-    "voyageai": "^0.0.3-1",
+    "voyageai": "^0.0.4",
     "zod": "^3.22.4"
   },
   "devDependencies": {

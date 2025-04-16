@@ -2,25 +2,31 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
+import { ClientProjectData } from '@/types/clientTypes';
 
 export default function BatchProcessButton({
   projectId,
   unprocessedItems
 }: {
   projectId: string;
-  unprocessedItems: { _id: string }[];
+  unprocessedItems: ClientProjectData[];
 }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const router = useRouter();
 
+  const filteredItems = unprocessedItems.filter(
+    item => !item.embedding || !Array.isArray(item.embedding) || item.embedding.length === 0
+  );
+
   const handleBatchProcess = async () => {
     try {
       setIsProcessing(true);
-      const total = unprocessedItems.length;
+      const total = filteredItems.length;
 
-      for (let i = 0; i < unprocessedItems.length; i++) {
-        const item = unprocessedItems[i];
+      for (let i = 0; i < filteredItems.length; i++) {
+        const item = filteredItems[i];
         try {
           await fetch(`/api/projects/data/${item._id}/process`, {
             method: 'POST',
@@ -41,7 +47,7 @@ export default function BatchProcessButton({
     }
   };
 
-  if (unprocessedItems.length === 0) {
+  if (filteredItems.length === 0) {
     return null;
   }
 
@@ -53,7 +59,10 @@ export default function BatchProcessButton({
     >
       {isProcessing ? (
         <div className="flex flex-col items-center">
-          <span>Processing {unprocessedItems.length} items...</span>
+          <div className="flex items-center mb-1">
+            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            <span>Processing {filteredItems.length} items...</span>
+          </div>
           <div className="w-full bg-blue-200 rounded-full h-2.5 mt-2">
             <div
               className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
@@ -62,7 +71,7 @@ export default function BatchProcessButton({
           </div>
         </div>
       ) : (
-        `Generate Embeddings for ${unprocessedItems.length} Items`
+        `Generate Embeddings for ${filteredItems.length} Items`
       )}
     </button>
   );

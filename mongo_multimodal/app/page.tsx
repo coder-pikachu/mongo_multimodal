@@ -10,10 +10,11 @@ export default function Home() {
         <div className="text-center">
           <div className="flex justify-center mb-8">
             <Image
-              src="/vector_search.png"
+              src="/logo.svg"
               alt="MongoDB Logo"
               width={80}
               height={80}
+              style={{ filter: 'invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%)' }}
 
               priority
             />

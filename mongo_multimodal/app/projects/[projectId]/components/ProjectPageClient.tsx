@@ -4,12 +4,43 @@ import { ClientProject, ClientProjectData } from '@/types/clientTypes';
 import UploadButton from './UploadButton';
 import DataList from './DataList';
 import ChatInterface from './ChatInterface';
-import { Info } from 'lucide-react';
+import { Info, Loader2 } from 'lucide-react';
+import { Suspense } from 'react';
 
 interface ProjectPageClientProps {
   project: ClientProject;
   data: ClientProjectData[];
   projectId: string;
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="animate-pulse space-y-8">
+      <div>
+        <div className="h-8 bg-gray-200 rounded w-1/3 mb-2" />
+        <div className="h-4 bg-gray-200 rounded w-2/3" />
+      </div>
+      <div className="bg-blue-50/50 border border-blue-200/50 rounded-lg p-4">
+        <div className="space-y-4">
+          <div className="h-4 bg-blue-100 rounded w-3/4" />
+          <div className="h-4 bg-blue-100 rounded w-1/2" />
+          <div className="h-4 bg-blue-100 rounded w-2/3" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-white p-4 rounded-lg border border-gray-200">
+            <div className="h-48 mb-4 bg-gray-200 rounded-lg" />
+            <div className="space-y-3">
+              <div className="h-4 bg-gray-200 rounded w-3/4" />
+              <div className="h-4 bg-gray-200 rounded w-1/2" />
+              <div className="h-4 bg-gray-200 rounded w-2/3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function ProjectPageClient({ project, data, projectId }: ProjectPageClientProps) {
@@ -53,11 +84,13 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
             </div>
           </div>
 
-          <DataList projectId={projectId} data={data} />
+          <Suspense fallback={<LoadingSkeleton />}>
+            <DataList projectId={projectId} data={data} />
+          </Suspense>
         </div>
 
         {/* Right Column (1/3 width) */}
-        <div className="h-full py--16">
+        <div className="h-full">
           <ChatInterface projectId={projectId} />
         </div>
       </div>

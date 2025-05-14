@@ -14,7 +14,7 @@ async function getProjects(): Promise<Project[]> {
       headers: {
         'Content-Type': 'application/json',
       },
-      // Required for server components to make requests
+      // Required for server components to make renpquests
       cache: 'no-store'
     });
 

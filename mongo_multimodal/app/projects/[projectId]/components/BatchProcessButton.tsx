@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { ClientProjectData } from '@/types/clientTypes';
 
+// Utility to check if an embedding is valid
+const hasValidEmbedding = (item: ClientProjectData): boolean => {
+  return !!item.embedding &&
+         Array.isArray(item.embedding) &&
+         item.embedding.length > 0 &&
+         item.embedding.every(val => typeof val === 'number');
+};
+
 export default function BatchProcessButton({
   projectId,
   unprocessedItems
@@ -16,9 +24,7 @@ export default function BatchProcessButton({
   const [progress, setProgress] = useState(0);
   const router = useRouter();
 
-  const filteredItems = unprocessedItems.filter(
-    item => !item.embedding || !Array.isArray(item.embedding) || item.embedding.length === 0
-  );
+  const filteredItems = unprocessedItems.filter(item => !hasValidEmbedding(item));
 
   const handleBatchProcess = async () => {
     try {

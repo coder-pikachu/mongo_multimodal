@@ -23,6 +23,14 @@ interface StrippedProjectData extends Omit<ClientProjectData, 'content'> {
 
 const ITEMS_PER_PAGE = 6;
 
+// Utility to check if an embedding is valid
+const hasValidEmbedding = (item: ClientProjectData | StrippedProjectData): boolean => {
+  return !!item.embedding &&
+         Array.isArray(item.embedding) &&
+         item.embedding.length > 0 &&
+         item.embedding.every(val => typeof val === 'number');
+};
+
 // Preview modal component
 function ImagePreviewModal({ item, onClose }: { item: ClientProjectData | StrippedProjectData; onClose: () => void }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -117,17 +125,6 @@ function DataSkeleton() {
   );
 }
 
-// Debugging function to log embedding data structure
-const debugEmbedding = (item: ClientProjectData | StrippedProjectData) => {
-  console.log(`Item ${item._id} embedding:`, {
-    exists: !!item.embedding,
-    isArray: Array.isArray(item.embedding),
-    length: item.embedding ? (Array.isArray(item.embedding) ? item.embedding.length : 'not an array') : 'undefined',
-    type: item.embedding ? typeof item.embedding : 'undefined',
-    value: item.embedding
-  });
-};
-
 export default function DataList({ data, projectId }: DataListProps) {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -144,11 +141,6 @@ export default function DataList({ data, projectId }: DataListProps) {
   // Strip base64 content from data for initial load to improve performance
   useEffect(() => {
     const strippedData: StrippedProjectData[] = data.map(item => {
-      // Debug the first few items to see what's happening
-      if (data.indexOf(item) < 3) {
-        debugEmbedding(item);
-      }
-
       return {
         ...item,
         content: {
@@ -212,7 +204,7 @@ export default function DataList({ data, projectId }: DataListProps) {
 
   const handleSelectAll = () => {
     const unprocessedIds = data
-      .filter(item => !item.embedding || !Array.isArray(item.embedding) || item.embedding.length === 0)
+      .filter(item => !hasValidEmbedding(item))
       .map(item => item._id.toString());
     setSelectedItems(prev =>
       prev.length === unprocessedIds.length ? [] : unprocessedIds
@@ -290,9 +282,7 @@ export default function DataList({ data, projectId }: DataListProps) {
   }
 
   // Get unprocessed items using the proper embedding check
-  const unprocessedItems = data.filter(item =>
-    !item.embedding || !Array.isArray(item.embedding) || item.embedding.length === 0
-  );
+  const unprocessedItems = data.filter(item => !hasValidEmbedding(item));
 
   return (
     <div className="space-y-6">
@@ -379,7 +369,7 @@ export default function DataList({ data, projectId }: DataListProps) {
               <p>Uploaded: {formatDate(item.createdAt)}</p>
               <p className="mt-1 flex items-center">
                 <span className="mr-2">Status:</span>
-                {item.embedding && Array.isArray(item.embedding) && item.embedding.length > 0 ? (
+                {hasValidEmbedding(item) ? (
                   <span className="flex items-center text-green-600">
                     <Check size={16} className="mr-1" />
                     Processed
@@ -413,7 +403,7 @@ export default function DataList({ data, projectId }: DataListProps) {
               </div>
             )}
 
-            {(!item.embedding || !Array.isArray(item.embedding) || item.embedding.length === 0) && (
+            {!hasValidEmbedding(item) && (
               <div className="mt-4 p-4 bg-gray-50 flex justify-between items-center rounded-lg">
                 <div className="flex items-center space-x-2">
                   <input

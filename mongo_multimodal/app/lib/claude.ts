@@ -137,3 +137,84 @@ export async function generateClaudeResponse(
     throw error;
   }
 }
+
+export async function generateOpenAIResponse(
+  query: string,
+  searchResults: any[]
+): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not set');
+  }
+
+  // Prepare the system and user messages
+  const systemPrompt = `You are an expert research assistant. Analyze the following items (text and images) and synthesize a comprehensive answer to the user's query: "${query}".\n\nInstructions:\n1. For text documents, summarize key points and relevance.\n2. For images, describe and explain relevance.\n3. Highlight connections.\n4. Give a comprehensive answer to the query.`;
+
+  let userContent = '';
+  const images: string[] = [];
+
+  searchResults.forEach((result, idx) => {
+    if (result.type === 'document' && result.content.text) {
+      userContent += `Document ${idx + 1}: ${result.content.text}\n\n`;
+    }
+    if (result.type === 'image' && result.content.base64) {
+      images.push(result.content.base64);
+      if (result.analysis?.description) {
+        userContent += `Description of Image ${images.length}: ${result.analysis.description}\n\n`;
+      }
+    }
+  });
+
+  const messages: any[] = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: [
+      { type: 'text', text: userContent || query },
+      ...images.map((img) => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${img}` } }))
+    ] }
+  ];
+
+  const requestBody = {
+    model: images.length > 0 ? 'gpt-4-vision-preview' : 'gpt-4o',
+    max_tokens: 2048,
+    messages,
+    temperature: 0
+  };
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error('OpenAI API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody
+      });
+      throw new Error(`OpenAI API error: ${response.status} - ${errorBody}`);
+    }
+    const result = await response.json();
+    return result.choices?.[0]?.message?.content || '';
+  } catch (error) {
+    console.error('Error calling OpenAI API:', error);
+    throw error;
+  }
+}
+
+export async function generateLLMResponse(
+  provider: 'claude' | 'openai',
+  query: string,
+  searchResults: any[]
+): Promise<string> {
+  if (provider === 'claude') {
+    return generateClaudeResponse(query, searchResults);
+  } else if (provider === 'openai') {
+    return generateOpenAIResponse(query, searchResults);
+  } else {
+    throw new Error('Unsupported provider');
+  }
+}

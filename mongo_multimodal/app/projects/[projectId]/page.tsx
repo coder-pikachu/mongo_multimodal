@@ -20,6 +20,7 @@ async function getProject(projectId: string): Promise<ClientProject | null> {
       name: project.name,
       description: project.description,
       userId: project.userId?.toString() || '',
+      sampleQuestions: project.sampleQuestions || [],
       createdAt: project.createdAt?.toISOString(),
       updatedAt: project.updatedAt?.toISOString(),
     };

@@ -46,15 +46,29 @@ function LoadingSkeleton() {
 export default function ProjectPageClient({ project, data, projectId }: ProjectPageClientProps) {
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[calc(100vh-4rem)]">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-[calc(100vh-10rem)]">
         {/* Left Column (2/3 width) */}
         <div className="lg:col-span-2 space-y-8 overflow-y-auto">
           <div>
             <h1 className="text-3xl font-bold mb-2">{project.name}</h1>
             <p className="text-gray-600">{project.description}</p>
 
+            {/* Sample Questions */}
+            {project.sampleQuestions && project.sampleQuestions.length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="font-medium text-blue-800 mb-2">Try asking:</h3>
+                <div className="space-y-2">
+                  {project.sampleQuestions.map((question, index) => (
+                    <div key={index} className="text-sm text-blue-700 italic">
+                      "{question}"
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Project Info Card */}
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            {/* <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start">
                 <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
                 <div>
@@ -64,17 +78,25 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
                     Upload content using the button below, then use the Research Assistant to ask questions about your content.
                   </p>
                   <div className="mt-2 text-sm text-blue-700">
+                    <p className="font-medium">Supported file types:</p>
+                    <ul className="list-disc pl-5 mt-1 space-y-1">
+                      <li>Images: JPEG, JPG</li>
+                      <li>Documents: PDF (up to 20MB) - automatically converted to images</li>
+                    </ul>
+                  </div>
+                  <div className="mt-2 text-sm text-blue-700">
                     <p className="font-medium">Search capabilities:</p>
                     <ul className="list-disc pl-5 mt-1 space-y-1">
                       <li>Semantic search across text documents</li>
                       <li>Image content analysis and search</li>
+                      <li>PDF document analysis (page by page)</li>
                       <li>Multimodal queries combining text and images</li>
                       <li>Contextual understanding of complex topics</li>
                     </ul>
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
 
           <div className="flex justify-between items-center">
@@ -90,8 +112,11 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
         </div>
 
         {/* Right Column (1/3 width) */}
-        <div className="h-full">
-          <ChatInterface projectId={projectId} />
+        <div className="h-full lg:col-span-2">
+          <ChatInterface
+            projectId={projectId}
+            sampleQuestions={project.sampleQuestions || []}
+          />
         </div>
       </div>
     </div>

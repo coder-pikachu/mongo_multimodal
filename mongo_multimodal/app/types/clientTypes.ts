@@ -10,6 +10,7 @@ export interface ClientProject {
   name: string;
   description: string;
   userId: string;
+  sampleQuestions?: string[];
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "mcp-puppeteer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-puppeteer"
+      ],
+      "env": {
+        "PUPPETEER_LAUNCH_OPTIONS": "{ \"headless\": false, \"executablePath\": \"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\", \"args\": [] , \"defaultViewport\": { \"width\": 1920, \"height\": 1080 } }",
+        "ALLOW_DANGEROUS": "true"
+      }
+    }
+  }
+}

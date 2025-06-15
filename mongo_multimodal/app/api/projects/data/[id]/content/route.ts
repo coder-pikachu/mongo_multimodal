@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const db = await getDb();
-    const id = params.id;
+    const { id } = await params;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(

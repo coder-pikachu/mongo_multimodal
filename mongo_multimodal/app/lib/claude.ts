@@ -32,7 +32,8 @@ interface ClaudeResponse {
 
 export async function generateClaudeResponse(
   query: string,
-  searchResults: any[]
+  searchResults: any[],
+  projectContext?: { name: string; description: string } | null
 ): Promise<string> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY is not set');
@@ -45,7 +46,7 @@ export async function generateClaudeResponse(
       content: [
         {
           type: 'text',
-          text: `I'm analyzing a research database and found relevant items, including text documents and images. Please help me understand and synthesize this information in relation to my query: "${query}"\n\nHere's what I found:\n\n1. For text documents, provide a concise summary of the key points and how they relate to my query.\n2. For images or diagrams, describe what you see and explain its relevance to my question.\n3. If there are connections between different items, please highlight those.\n4. Finally, give a comprehensive answer to my original query based on all the information provided.`
+          text: `I'm analyzing a research database and found relevant items, including text documents and images.${projectContext ? ` This search is within the project "${projectContext.name}" with your purpose being - ${projectContext.description}` : ''} Please help me understand and synthesize this information in relation to my query: "${query}"\n\nHere's what I found:\n\n1. For text documents, provide a concise summary of the key points and how they relate to my query.\n2. For images or diagrams, describe what you see and explain its relevance to my question.\n3. If there are connections between different items, please highlight those.\n4. Finally, give a comprehensive answer to my original query based on all the information provided${projectContext ? `, keeping in mind you working as a ${projectContext.description}` : ''}.`
         }
       ]
     }
@@ -88,13 +89,14 @@ export async function generateClaudeResponse(
   // Add final instruction
   messages[0].content.push({
     type: 'text',
-    text: 'Please provide a comprehensive response that:\n1. Answers the query using the provided context\n2. Cites specific information from the documents/images\n3. Highlights any relevant connections between different items\n4. Suggests potential follow-up questions or areas for further exploration'
+    text: 'Please provide a comprehensive response in beautiful and concise markdown format that:\n1. Answers the query using the provided context\n2. Cites specific information from the documents/images\n3. Highlights any relevant connections between different items\n4. Suggests potential follow-up questions or areas for further exploration'
   });
 
   try {
     const requestBody = {
       model: 'claude-3-5-haiku-20241022',
-      max_tokens: 4096,
+      //model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
       messages: messages.map(msg => ({
         role: msg.role,
         content: Array.isArray(msg.content) ? msg.content : [{ type: 'text', text: msg.content }]
@@ -140,14 +142,15 @@ export async function generateClaudeResponse(
 
 export async function generateOpenAIResponse(
   query: string,
-  searchResults: any[]
+  searchResults: any[],
+  projectContext?: { name: string; description: string } | null
 ): Promise<string> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set');
   }
 
   // Prepare the system and user messages
-  const systemPrompt = `You are an expert research assistant. Analyze the following items (text and images) and synthesize a comprehensive answer to the user's query: "${query}".\n\nInstructions:\n1. For text documents, summarize key points and relevance.\n2. For images, describe and explain relevance.\n3. Highlight connections.\n4. Give a comprehensive answer to the query.`;
+  const systemPrompt = `You are an expert research assistant. Analyze the following items (text and images) and synthesize a comprehensive answer to the user's query: "${query}".${projectContext ? ` This search is within the project "${projectContext.name}" - ${projectContext.description}` : ''}\n\nInstructions:\n1. For text documents, summarize key points and relevance.\n2. For images, describe and explain relevance.\n3. Highlight connections.\n4. Give a comprehensive answer to the query${projectContext ? `, keeping in mind the project context: ${projectContext.description}` : ''}.`;
 
   let userContent = '';
   const images: string[] = [];
@@ -173,7 +176,7 @@ export async function generateOpenAIResponse(
   ];
 
   const requestBody = {
-    model: images.length > 0 ? 'gpt-4-vision-preview' : 'gpt-4o',
+    model: images.length > 0 ? 'gpt-4o-mini' : 'gpt-4o-mini',
     max_tokens: 2048,
     messages,
     temperature: 0
@@ -208,12 +211,13 @@ export async function generateOpenAIResponse(
 export async function generateLLMResponse(
   provider: 'claude' | 'openai',
   query: string,
-  searchResults: any[]
+  searchResults: any[],
+  projectContext?: { name: string; description: string } | null
 ): Promise<string> {
   if (provider === 'claude') {
-    return generateClaudeResponse(query, searchResults);
+    return generateClaudeResponse(query, searchResults, projectContext);
   } else if (provider === 'openai') {
-    return generateOpenAIResponse(query, searchResults);
+    return generateOpenAIResponse(query, searchResults, projectContext);
   } else {
     throw new Error('Unsupported provider');
   }

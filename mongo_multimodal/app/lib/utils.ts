@@ -1,5 +1,5 @@
 import { Db, ObjectId } from 'mongodb';
-import { generateClaudeResponse, generateLLMResponse } from './claude';
+import { generateLLMResponse } from './claude';
 import { generateMultimodalEmbedding } from './voyageai';
 
 export function formatDate(date: string | Date | undefined): string {
@@ -21,6 +21,14 @@ export async function doVectorImageSearch(type: 'text' | 'image', query: string,
       'query'
     );
 
+    // Optimized for direct vector search with balanced performance/accuracy
+    const searchConfig = {
+      exact: false, // Use ANN for better performance with large datasets
+      limit: 12,    // Slightly more results for better discovery
+      numCandidates: 250, // ~20x limit for optimal recall (MongoDB 2024 best practice)
+      similarityThreshold: 0.6 // Standard threshold for discovery
+    };
+
     // Perform vector search using MongoDB Atlas
     const results = await db.collection('projectData')
       .aggregate([
@@ -30,9 +38,9 @@ export async function doVectorImageSearch(type: 'text' | 'image', query: string,
             "path": "embedding",
             "queryVector": queryEmbedding,
 
-            "exact": false,
-            "limit": 10,
-            "numCandidates": 10,
+            "exact": searchConfig.exact,
+            "limit": searchConfig.limit,
+            "numCandidates": searchConfig.numCandidates,
           }
         },
         {
@@ -48,7 +56,7 @@ export async function doVectorImageSearch(type: 'text' | 'image', query: string,
         },
         {
           $match: {
-            score: { $gte: 0.6 }
+            score: { $gte: searchConfig.similarityThreshold }
           }
         },
         {
@@ -82,6 +90,18 @@ export async function doVectorSearchAndAnalyse(
       'query'
     );
 
+    // Optimize search parameters based on scope
+    const isProjectSpecific = !!paramsFound?.projectId;
+    const searchConfig = {
+      // Global search: more results for comprehensive analysis
+      // Project search: focused results for specific project context
+      limit: isProjectSpecific ? 2 : 10,
+      // numCandidates: 20-30x limit for optimal recall (MongoDB 2024 best practice)
+      numCandidates: isProjectSpecific ? 150 : 300,
+      // Slightly higher threshold for better quality
+      similarityThreshold: 0.65
+    };
+
     // Perform vector search using MongoDB Atlas
     const results = await db.collection('projectData')
       .aggregate([
@@ -94,8 +114,8 @@ export async function doVectorSearchAndAnalyse(
               }
             } : {}),
 
-            "limit": 2,
-            "numCandidates": 2,
+            "limit": searchConfig.limit,
+            "numCandidates": searchConfig.numCandidates,
             "path": "embedding",
             "queryVector": queryEmbedding,
 
@@ -115,7 +135,7 @@ export async function doVectorSearchAndAnalyse(
           }
         }, {
           $match: {
-            score: { $gte: 0.6 }
+            score: { $gte: searchConfig.similarityThreshold }
           }
         },
         {
@@ -128,9 +148,28 @@ export async function doVectorSearchAndAnalyse(
 
     console.log('Results:', results);
 
+    // Fetch project context if this is a project-specific search
+    let projectContext = null;
+    if (paramsFound?.projectId) {
+      try {
+        const project = await db.collection('projects').findOne(
+          { _id: new ObjectId(paramsFound.projectId) },
+          { projection: { name: 1, description: 1 } }
+        );
+        if (project) {
+          projectContext = {
+            name: project.name,
+            description: project.description
+          };
+        }
+      } catch (error) {
+        console.warn('Failed to fetch project context:', error);
+      }
+    }
+
     // Generate a comprehensive response using the selected LLM
     const selectedProvider = provider || (process.env.LLM_FOR_ANALYSIS as 'claude' | 'openai') || 'claude';
-    const llmResponse = await generateLLMResponse(selectedProvider, query, results);
+    const llmResponse = await generateLLMResponse(selectedProvider, query, results, projectContext);
 
     // Merge LLM's analysis into each result
     const enrichedResults = results.map(result => ({

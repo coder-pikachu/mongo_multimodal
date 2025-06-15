@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 export default function UploadButton({ projectId }: { projectId: string }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
+  const [pdfProcessingStatus, setPdfProcessingStatus] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -37,6 +38,75 @@ export default function UploadButton({ projectId }: { projectId: string }) {
     }
   };
 
+  const processPDFFile = async (file: File) => {
+    try {
+      // Dynamic import to avoid SSR issues
+      const { validatePDFFile, extractPDFData, convertPDFToImages } = await import('@/lib/pdf-to-image');
+      
+      // Validate PDF file
+      validatePDFFile(file);
+      
+      setPdfProcessingStatus(`Processing ${file.name}...`);
+      setUploadProgress(prev => ({
+        ...prev,
+        [file.name]: 10
+      }));
+
+      // Extract PDF data
+      const pdfData = await extractPDFData(file);
+      
+      // Convert PDF to images
+      setPdfProcessingStatus(`Converting ${file.name} pages to images...`);
+      const images = await convertPDFToImages(pdfData, {
+        imageFormat: 'jpeg',
+        jpegQuality: 0.85,
+        maxSizeBytes: 2 * 1024 * 1024 // 2MB per image
+      });
+
+      setUploadProgress(prev => ({
+        ...prev,
+        [file.name]: 30
+      }));
+
+      // Upload each page as a separate image
+      const totalPages = images.length;
+      for (let i = 0; i < images.length; i++) {
+        const pageNum = i + 1;
+        setPdfProcessingStatus(`Uploading page ${pageNum} of ${totalPages} from ${file.name}...`);
+        
+        // Convert data URL to blob
+        const response = await fetch(images[i].dataUrl);
+        const blob = await response.blob();
+        
+        // Create a file from the blob
+        const pageFile = new File([blob], `${file.name.replace('.pdf', '')}_page_${pageNum}.jpg`, {
+          type: 'image/jpeg'
+        });
+
+        // Upload the page
+        await uploadFile(pageFile);
+        
+        // Update progress
+        const progress = 30 + ((i + 1) / totalPages) * 70;
+        setUploadProgress(prev => ({
+          ...prev,
+          [file.name]: Math.round(progress)
+        }));
+      }
+
+      setPdfProcessingStatus('');
+      
+    } catch (error) {
+      console.error(`PDF processing error for ${file.name}:`, error);
+      setPdfProcessingStatus('');
+      setUploadProgress(prev => ({
+        ...prev,
+        [file.name]: -1
+      }));
+      throw error;
+    }
+  };
+
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
@@ -53,7 +123,11 @@ export default function UploadButton({ projectId }: { projectId: string }) {
 
       // Upload files sequentially
       for (const file of files) {
-        await uploadFile(file);
+        if (file.type === 'application/pdf') {
+          await processPDFFile(file);
+        } else {
+          await uploadFile(file);
+        }
       }
 
       router.refresh();
@@ -62,6 +136,7 @@ export default function UploadButton({ projectId }: { projectId: string }) {
     } finally {
       setIsUploading(false);
       setUploadProgress({});
+      setPdfProcessingStatus('');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -82,7 +157,7 @@ export default function UploadButton({ projectId }: { projectId: string }) {
         type="file"
         onChange={handleUpload}
         className="hidden"
-        accept="image/jpeg,image/jpg"
+        accept="image/jpeg,image/jpg,application/pdf"
         multiple
       />
       <button
@@ -92,6 +167,13 @@ export default function UploadButton({ projectId }: { projectId: string }) {
       >
         {isUploading ? `Uploading (${getOverallProgress()}%)` : 'Upload Files'}
       </button>
+
+      {/* PDF Processing Status */}
+      {pdfProcessingStatus && (
+        <div className="text-sm text-blue-600 mt-2">
+          {pdfProcessingStatus}
+        </div>
+      )}
 
       {/* Progress indicators */}
       {Object.entries(uploadProgress).length > 0 && (

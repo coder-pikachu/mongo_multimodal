@@ -12,6 +12,7 @@ export interface Project {
   name: string;
   description: string;
   userId: ObjectId;
+  sampleQuestions?: string[];
   createdAt: Date;
   updatedAt: Date;
 }

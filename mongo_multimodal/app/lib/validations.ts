@@ -10,6 +10,7 @@ export const projectSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500),
   userId: z.string(),
+  sampleQuestions: z.array(z.string().min(1).max(200)).max(5).optional(),
 });
 
 export const projectDataSchema = z.object({

@@ -14,7 +14,17 @@ const nextConfig: NextConfig = {
         dns: false,
         'util/types': false,
         timers: false,
-        'timers/promises': false
+        'timers/promises': false,
+        'node:child_process': false,
+        'node:fs': false,
+        'node:fs/promises': false,
+        'node:path': false
+      };
+      
+      // Add alias for pdfjs-dist to avoid issues with canvas
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'canvas': false
       };
     }
     return config;

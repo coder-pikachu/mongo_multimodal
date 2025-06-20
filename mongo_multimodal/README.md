@@ -60,6 +60,15 @@ VERCEL_URL=http://localhost:3000
 
 #### Create Vector Search Index
 
+You can create the vector search index in two ways:
+
+**Option 1: Using the Script (Recommended)**
+Run the provided script after setting up your environment:
+```bash
+npm run create:index
+```
+
+**Option 2: Manual Creation in Atlas UI**
 1. Go to your MongoDB Atlas cluster
 2. Navigate to "Search" → "Create Search Index"
 3. Select "JSON Editor" and use this configuration:
@@ -82,6 +91,8 @@ VERCEL_URL=http://localhost:3000
 4. Name the index: `vector_index`
 5. Select the database: `multimodal` (or your database name)
 6. Select the collection: `projectData`
+
+**Note**: Vector search requires MongoDB Atlas M10 tier or higher.
 
 ### 5. Initialize the Database
 
@@ -225,7 +236,6 @@ npm run create:index    # Create vector search indexes
 
 # Code Quality
 npm run lint            # Run ESLint
-npm run type-check      # Run TypeScript checks
 ```
 
 ## 🎯 Use Cases

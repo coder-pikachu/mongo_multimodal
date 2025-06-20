@@ -26,8 +26,8 @@ A powerful enterprise-grade application that enables semantic search across visu
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-repo/mongo-multimodal.git
-cd mongo-multimodal
+git clone https://github.com/coder-pikachu/mongo_multimodal.git
+cd mongo_multimodal/mongo_multimodal
 ```
 
 ### 2. Install Dependencies

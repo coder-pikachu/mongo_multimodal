@@ -11,8 +11,18 @@ interface ProjectDataItem {
     text?: string;
     base64?: string;
   };
-  metadata: any;
-  analysis: any;
+  metadata: {
+    filename: string;
+    mimeType: string;
+    size: number;
+    [key: string]: unknown;
+  };
+  analysis: {
+    description: string;
+    tags: string[];
+    insights: string[];
+    [key: string]: unknown;
+  };
   embedding: number[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -21,16 +31,16 @@ interface ProjectDataItem {
 
 export async function GET(
   request: Request,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const paramsFound = await params;
+    const { projectId } = await params;
     const db = await getDb();
 
     // First, get all data items without base64 content for images
     const data = await db
       .collection('projectData')
-      .find({ projectId: new ObjectId(paramsFound.projectId) })
+      .find({ projectId: new ObjectId(projectId) })
       .project({
         _id: 1,
         projectId: 1,

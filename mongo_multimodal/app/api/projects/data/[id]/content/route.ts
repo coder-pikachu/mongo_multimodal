@@ -8,11 +8,11 @@ import { ObjectId } from 'mongodb';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const db = await getDb();
     const { id } = await params;
+    const db = await getDb();
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(

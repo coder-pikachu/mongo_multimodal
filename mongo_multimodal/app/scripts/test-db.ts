@@ -5,14 +5,13 @@ import { resolve } from 'path';
 dotenv.config({ path: resolve(__dirname, '../../.env.local') });
 
 import { getDb } from '../lib/mongodb';
-import { ObjectId } from 'mongodb';
-import { userSchema, projectSchema, projectDataSchema } from '../lib/validations';
+import { userSchema } from '../lib/validations';
 
 async function testDbConnection() {
   try {
     console.log('Testing MongoDB connection...');
     const db = await getDb();
-    
+
     // Test ping
     await db.command({ ping: 1 });
     console.log('MongoDB connection successful!');
@@ -45,7 +44,7 @@ async function testDbConnection() {
         }
       });
       console.log('Users collection created with validation');
-    } catch (e) {
+    } catch {
       console.log('Users collection already exists');
     }
 
@@ -63,12 +62,12 @@ async function testDbConnection() {
       projects: []
     };
 
-    const validatedUser = userSchema.parse(testUser);
+    userSchema.parse(testUser);
     console.log('User validation successful');
 
     // Clean up test data
     await db.collection('users').deleteOne({ email: 'test@example.com' });
-    
+
     console.log('All tests passed!');
   } catch (error) {
     console.error('Database test failed:', error);

@@ -30,9 +30,32 @@ interface ClaudeResponse {
   };
 }
 
+interface SearchResult {
+  _id: string;
+  type: 'image' | 'document';
+  content: {
+    text?: string;
+    base64?: string;
+  };
+  metadata: {
+    filename: string;
+    mimeType: string;
+    size: number;
+    [key: string]: unknown;
+  };
+  analysis: {
+    description: string;
+    tags: string[];
+    insights: string[];
+    [key: string]: unknown;
+  };
+  createdAt: string;
+  score?: number;
+}
+
 export async function generateClaudeResponse(
   query: string,
-  searchResults: any[],
+  searchResults: SearchResult[],
   projectContext?: { name: string; description: string } | null
 ): Promise<string> {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -89,7 +112,7 @@ export async function generateClaudeResponse(
   // Add final instruction
   messages[0].content.push({
     type: 'text',
-    text: 'Please provide a comprehensive response in beautiful and concise markdown format that:\n1. Answers the query using the provided context\n2. Cites specific information from the documents/images\n3. Highlights any relevant connections between different items\n4. Suggests potential follow-up questions or areas for further exploration'
+    text: 'Please provide a comprehensive response in beautiful and concise markdown format that:\n1. Answers the query using the provided context\n2. Cites specific information from the documents/images\n3. Highlights any relevant connections between different items\n4. Suggests potential follow-up questions or areas for further exploration\n 5. IMPORTANT: If there is no relation to the image and the user query, please tell the user to rephrase the question as its not bringing the right data from the semantic search. Don\'t include any other text or formatting than the markdown.'
   });
 
   try {
@@ -142,7 +165,7 @@ export async function generateClaudeResponse(
 
 export async function generateOpenAIResponse(
   query: string,
-  searchResults: any[],
+  searchResults: SearchResult[],
   projectContext?: { name: string; description: string } | null
 ): Promise<string> {
   if (!process.env.OPENAI_API_KEY) {
@@ -167,11 +190,20 @@ export async function generateOpenAIResponse(
     }
   });
 
-  const messages: any[] = [
+  interface OpenAIMessage {
+    role: 'system' | 'user';
+    content: string | Array<{
+      type: 'text' | 'image_url';
+      text?: string;
+      image_url?: { url: string };
+    }>;
+  }
+
+  const messages: OpenAIMessage[] = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: [
       { type: 'text', text: userContent || query },
-      ...images.map((img) => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${img}` } }))
+      ...images.map((img) => ({ type: 'image_url' as const, image_url: { url: `data:image/jpeg;base64,${img}` } }))
     ] }
   ];
 
@@ -211,7 +243,7 @@ export async function generateOpenAIResponse(
 export async function generateLLMResponse(
   provider: 'claude' | 'openai',
   query: string,
-  searchResults: any[],
+  searchResults: SearchResult[],
   projectContext?: { name: string; description: string } | null
 ): Promise<string> {
   if (provider === 'claude') {

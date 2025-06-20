@@ -1,8 +1,6 @@
 import { getDb } from '@/lib/mongodb';
 import { doVectorSearchAndAnalyse } from '@/lib/utils';
-import { generateMultimodalEmbedding } from '@/lib/voyageai';
 import { NextResponse } from 'next/server';
-import { type } from 'os';
 
 
 export async function POST( request: Request )
@@ -20,7 +18,7 @@ export async function POST( request: Request )
 
 
     // Generate embedding for the search query
-    const { results, claudeResponse } = await doVectorSearchAndAnalyse( type, query, db );
+    const { results, analysis: claudeResponse } = await doVectorSearchAndAnalyse( type, query, db );
 
     return NextResponse.json( {
       results,

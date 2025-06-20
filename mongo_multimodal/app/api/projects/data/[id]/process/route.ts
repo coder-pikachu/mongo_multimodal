@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
@@ -6,11 +5,12 @@ import { generateMultimodalEmbedding } from '@/lib/voyageai';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: idString } = await params;
     const db = await getDb();
-    const id = new ObjectId(params.id);
+    const id = new ObjectId(idString);
 
     // Get the project data
     const data = await db.collection('projectData').findOne({ _id: id });

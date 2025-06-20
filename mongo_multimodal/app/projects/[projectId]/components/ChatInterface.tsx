@@ -429,12 +429,11 @@ export default function ChatInterface({ projectId, sampleQuestions = [] }: ChatI
                           {children}
                         </th>
                       ),
-                      td: ({children}) => (
+                      td: () => (
                         <td className="px-4 py-2 text-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600">
-                          {children}
                         </td>
                       ),
-                      hr: ({children}) => (
+                      hr: () => (
                         <hr className="my-6 border-gray-200 dark:border-gray-600" />
                       ),
                     }}

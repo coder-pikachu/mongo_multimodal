@@ -27,6 +27,7 @@ npm run lint         # Run ESLint with Next.js rules
 ## Architecture Overview
 
 ### Core Technologies
+
 - **Frontend**: Next.js 15.1.7 with App Router, React 19, TypeScript
 - **Database**: MongoDB 6.3.0 with Atlas Vector Search
 - **AI Services**:
@@ -38,6 +39,7 @@ npm run lint         # Run ESLint with Next.js rules
 - **Form Handling**: React Hook Form with Zod validation
 
 ### Project Structure
+
 ```
 /app/                    # Next.js App Router
 ├── api/                 # API routes for backend operations
@@ -69,6 +71,7 @@ npm run lint         # Run ESLint with Next.js rules
 5. **Type Safety**: Strict TypeScript with comprehensive type definitions in `/app/types/`
 
 ### Environment Variables Required
+
 ```
 MONGODB_URI          # MongoDB Atlas connection string
 VOYAGE_API_KEY       # VoyageAI API key for embeddings
@@ -79,25 +82,29 @@ VERCEL_URL           # Base URL (defaults to http://localhost:3000)
 ```
 
 ### Database Schema Considerations
+
 - Projects are stored in the `projects` collection
 - Each project contains embedded documents with vector fields
 - Vector indexes must be created using `npm run create:index` before vector search will work
 - Embedding dimensions: 1024 (VoyageAI default)
 
 ### Development Workflow
+
 1. Ensure MongoDB connection is working: `npm run test:db`
 2. Create vector indexes if not exists: `npm run create:index`
 3. Start development server: `npm run dev`
 4. Before committing, ensure linting passes: `npm run lint`
 
 ### API Integration Points
+
 - **File Upload**: POST `/api/projects/[id]/upload` - Handles multipart form data
 - **Vector Search**: POST `/api/vector-search` - Performs similarity search
 - **Q&A Interface**: POST `/api/ask-question` - Natural language queries
 - **Project Data**: GET/POST `/api/projects/data/[id]/content` - Manage project content
 
 ### Important Implementation Details
-1. **File Processing**: 
+
+1. **File Processing**:
    - Images: JPEG/JPG files analyzed via Claude AI
    - PDFs: Converted to images (one per page) with 2MB size limit per page
    - PDF files must be under 20MB
@@ -116,12 +123,14 @@ VERCEL_URL           # Base URL (defaults to http://localhost:3000)
 The application implements a sophisticated multimodal query system that combines vector similarity search with LLM-powered analysis:
 
 ### 1. Main Search Entry Point
+
 - **Primary API**: `/api/search/route.ts` - Global search across all data
 - **Project-Specific API**: `/api/projects/[projectId]/search/` - Scoped to specific projects
 - **Input Types**: Supports both text queries and image-based queries
 - **Error Handling**: Implements retry logic with exponential backoff for timeouts
 
 ### 2. Query Processing Pipeline
+
 ```
 User Query → Embedding Generation → Vector Search → LLM Analysis → Response
 ```
@@ -137,6 +146,7 @@ POST /api/search
 ```
 
 **Processing Steps**:
+
 1. Validates query presence
 2. Calls `doVectorSearchAndAnalyse()` with query and type
 3. Returns results with LLM analysis
@@ -149,6 +159,7 @@ POST /api/search
    - Handles both text and image embeddings
 
 2. **Vector Search** (MongoDB Atlas):
+
    ```javascript
    {
      $vectorSearch: {
@@ -161,6 +172,7 @@ POST /api/search
      }
    }
    ```
+
    - No project filtering for global search
    - Returns top 10 candidates
    - Applies similarity threshold of 0.6
@@ -172,6 +184,7 @@ POST /api/search
    - Generates comprehensive, contextual response
 
 4. **Response Structure**:
+
    ```javascript
    {
      results: [/* vector search results with scores */],
@@ -180,6 +193,7 @@ POST /api/search
    ```
 
 ### 5. Key Functions and Files
+
 - **Main API Route**: `/api/search/route.ts` - Entry point for global search
 - **Core Orchestrator**: `doVectorSearchAndAnalyse()` in `/app/lib/utils.ts`
 - **Vector Search**: MongoDB aggregation pipeline with `$vectorSearch` stage
@@ -187,11 +201,13 @@ POST /api/search
 - **Embedding Service**: `generateMultimodalEmbedding()` in `/app/lib/voyageai.ts`
 
 ### 6. Project-Scoped vs Global Search
+
 - **Global Search** (`/api/search/`): Searches across all data, returns up to 10 results
 - **Project Search** (`/api/projects/[projectId]/search/`): Filtered by project, returns 2 results
 - Both use the same `doVectorSearchAndAnalyse()` function with different parameters
 
 ### 7. Data Flow Considerations
+
 - **Multimodal Support**: Seamlessly handles text and image queries
 - **Performance**: Result limits vary by search scope (2 for project, 10 for global)
 - **Timeout Handling**: Returns HTTP 529 status on timeout for retry logic
@@ -199,5 +215,6 @@ POST /api/search
 - **Error Handling**: Comprehensive error catching with appropriate status codes
 
 ### IMPORTANT
+
 - When ready to test using browser, don't run the the dev server. Ask the user to run the command and then use puppeteer to open the browser and navigate to the ur
 l.

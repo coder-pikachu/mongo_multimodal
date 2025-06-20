@@ -11,7 +11,7 @@ interface SearchError extends Error {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string; }; }
+  { params }: { params: Promise<{ projectId: string }> }
 )
 {
   try
@@ -35,9 +35,9 @@ export async function POST(
       } );
     } catch (searchError: unknown) {
       console.error('Vector search or analysis error:', searchError);
-      
+
       const error = searchError as SearchError;
-      
+
       // Check if this is a timeout from Claude API (usually manifests as a 429 or 504)
       if (error.message?.includes('timeout') ||
           error.message?.includes('429') ||

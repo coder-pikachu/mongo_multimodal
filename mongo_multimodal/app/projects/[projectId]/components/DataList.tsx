@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { ReactNode, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ClientProjectData } from '@/types/clientTypes';
 import { formatDate } from '@/lib/clientUtils';
 import { Loader2, Eye, ImageIcon, FileText, RefreshCw, Check } from 'lucide-react';
@@ -45,10 +45,6 @@ function ImagePreviewModal({ item, onClose }: { item: ClientProjectData | Stripp
           setImageData(item.content.base64);
         } else {
           // Fetch image data
-          const baseUrl = process.env.VERCEL_URL
-            ? `${process.env.VERCEL_URL}`
-            : 'http://localhost:3000';
-
           const response = await fetch(`/api/projects/data/${item._id}/content`, {
             method: 'GET',
             headers: {
@@ -154,24 +150,7 @@ export default function DataList({ data, projectId }: DataListProps) {
     setHasMore(strippedData.length > ITEMS_PER_PAGE);
   }, [data]);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoading) {
-          loadMore();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-
-    return () => observer.disconnect();
-  }, [hasMore, isLoading]);
-
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
 
@@ -192,7 +171,24 @@ export default function DataList({ data, projectId }: DataListProps) {
     setPage(nextPage);
     setHasMore(end < data.length);
     setIsLoading(false);
-  };
+  }, [page, data]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoading) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, loadMore]);
 
   const handleSelectItem = (itemId: string) => {
     setSelectedItems(prev =>
@@ -235,9 +231,6 @@ export default function DataList({ data, projectId }: DataListProps) {
 
     try {
       setIsProcessing(true);
-      const baseUrl = process.env.VERCEL_URL
-        ? `${process.env.VERCEL_URL}`
-        : 'http://localhost:3000';
 
       // For each selected item call process
       for (const itemId of selectedItems) {
@@ -270,7 +263,15 @@ export default function DataList({ data, projectId }: DataListProps) {
   };
 
   const handlePreview = (item: StrippedProjectData) => {
-    setPreviewItem(item);
+    // Convert StrippedProjectData to ClientProjectData format for the modal
+    const modalItem: ClientProjectData = {
+      ...item,
+      content: {
+        ...item.content,
+        base64: item.content.base64 || undefined
+      }
+    };
+    setPreviewItem(modalItem);
   };
 
   if (data.length === 0) {

@@ -4,9 +4,10 @@ import { ObjectId } from 'mongodb';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
+    const { projectId } = await params;
     const db = await getDb();
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -19,7 +20,7 @@ export async function POST(
     const base64 = Buffer.from(buffer).toString('base64');
 
     const projectData = {
-      projectId: new ObjectId(params.projectId),
+      projectId: new ObjectId(projectId),
       type: file.type.startsWith('image/') ? 'image' : 'document',
       content: {
         base64: file.type.startsWith('image/') ? base64 : undefined,

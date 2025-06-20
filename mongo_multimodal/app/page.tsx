@@ -35,7 +35,7 @@ export default function Home() {
         <p className="text-xl text-gray-600 dark:text-zinc-400 max-w-2xl mx-auto text-center mb-12">
           Upload PDFs and images, then ask questions in natural language to find relevant content across all your documents.
         </p>
-        
+
         {/* Process Flow */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           <div className="text-center">
@@ -47,7 +47,7 @@ export default function Home() {
               Upload PDFs (up to 20MB) and images. PDFs are automatically converted to searchable pages.
             </p>
           </div>
-          
+
           <div className="text-center">
             <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl font-bold text-white">2</span>
@@ -57,7 +57,7 @@ export default function Home() {
               Content is analyzed by Claude AI and converted to vector embeddings for semantic search.
             </p>
           </div>
-          
+
           <div className="text-center">
             <div className="h-16 w-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl font-bold text-white">3</span>
@@ -78,24 +78,24 @@ export default function Home() {
               <p className="text-gray-600 dark:text-zinc-400 mb-4 text-center">Example queries you can try:</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-4 border border-gray-300/30 dark:border-zinc-700/30">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-mono text-sm">"How to calculate pressure?"</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-mono text-sm">&quot;How to calculate pressure?&quot;</span>
                   <p className="text-gray-500 dark:text-zinc-500 text-xs mt-1">Find technical calculations and formulas</p>
                 </div>
                 <div className="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-4 border border-gray-300/30 dark:border-zinc-700/30">
-                  <span className="text-blue-600 dark:text-blue-400 font-mono text-sm">"Show me technical diagrams"</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-mono text-sm">&quot;Show me technical diagrams&quot;</span>
                   <p className="text-gray-500 dark:text-zinc-500 text-xs mt-1">Discover relevant technical drawings</p>
                 </div>
                 <div className="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-4 border border-gray-300/30 dark:border-zinc-700/30">
-                  <span className="text-purple-600 dark:text-purple-400 font-mono text-sm">"Safety procedures"</span>
+                  <span className="text-purple-600 dark:text-purple-400 font-mono text-sm">&quot;Safety procedures&quot;</span>
                   <p className="text-gray-500 dark:text-zinc-500 text-xs mt-1">Search for safety-related content</p>
                 </div>
                 <div className="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-4 border border-gray-300/30 dark:border-zinc-700/30">
-                  <span className="text-pink-600 dark:text-pink-400 font-mono text-sm">"Process specifications"</span>
+                  <span className="text-pink-600 dark:text-pink-400 font-mono text-sm">&quot;Process specifications&quot;</span>
                   <p className="text-gray-500 dark:text-zinc-500 text-xs mt-1">Find detailed process documentation</p>
                 </div>
               </div>
             </div>
-            
+
             {/* API Info */}
             <div className="bg-gray-200/50 dark:bg-zinc-900/50 rounded-lg p-6 border border-gray-400/30 dark:border-zinc-600/30">
               <h4 className="text-lg font-semibold mb-3 flex items-center">
@@ -211,7 +211,7 @@ export default function Home() {
             <ArrowRight className="ml-2 h-6 w-6" />
           </Link>
         </div>
-        
+
         {/* Quick stats */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
           <div className="text-center">

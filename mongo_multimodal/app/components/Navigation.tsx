@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Search, LogOut, FolderOpen, Moon, Sun, Image as ImageIcon } from 'lucide-react';
+import { Home, Search, LogOut, FolderOpen, Moon, Sun, Image as ImageIcon, Network } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
@@ -66,6 +66,13 @@ export function Navigation() {
               >
                 <ImageIcon className="w-4 h-4 mr-2" />
                 Vector Search
+              </Link>
+              <Link
+                href="/solution-architecture"
+                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300"
+              >
+                <Network className="w-4 h-4 mr-2" />
+                Architecture
               </Link>
             </div>
           </div>

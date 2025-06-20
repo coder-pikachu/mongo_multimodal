@@ -4,13 +4,13 @@ import { NextResponse } from 'next/server';
 
 export async function GET(
   request: Request,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const paramsFound = await params;
+    const { projectId } = await params;
     const db = await getDb();
     const project = await db.collection('projects').findOne({
-      _id: new ObjectId(paramsFound.projectId)
+      _id: new ObjectId(projectId)
     });
 
     if (!project) {

@@ -24,6 +24,11 @@ interface VectorSearchResult {
   createdAt: string;
 }
 
+interface VectorSearchFormData {
+  query?: string;
+  image?: FileList;
+}
+
 // Prebaked questions for different types of images
 const PREBAKED_QUESTIONS: { [key: string]: string[] } = {
   default: [
@@ -61,12 +66,12 @@ export default function VectorSearchPage() {
   const [isAsking, setIsAsking] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<VectorSearchResult | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [minScore, setMinScore] = useState(0.6);
+  const [minScore, setMinScore] = useState(0.5);
   const [maxResults, setMaxResults] = useState(10);
-  const { register, handleSubmit, watch } = useForm();
+  const { register, handleSubmit, watch } = useForm<VectorSearchFormData>();
   const imageFile = watch('image');
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: VectorSearchFormData) => {
     if (!data.query?.trim() && !data.image?.[0]) return;
 
     setIsSearching(true);

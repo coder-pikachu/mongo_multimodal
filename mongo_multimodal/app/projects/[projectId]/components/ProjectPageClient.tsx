@@ -4,7 +4,6 @@ import { ClientProject, ClientProjectData } from '@/types/clientTypes';
 import UploadButton from './UploadButton';
 import DataList from './DataList';
 import ChatInterface from './ChatInterface';
-import { Info, Loader2 } from 'lucide-react';
 import { Suspense } from 'react';
 
 interface ProjectPageClientProps {
@@ -60,7 +59,7 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
                 <div className="space-y-2">
                   {project.sampleQuestions.map((question, index) => (
                     <div key={index} className="text-sm text-blue-700 italic">
-                      "{question}"
+                      &quot;{question}&quot;
                     </div>
                   ))}
                 </div>

@@ -30,12 +30,16 @@ interface SearchResult {
   score: number;
 }
 
+interface FormData {
+  query: string;
+}
+
 export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const { register, handleSubmit } = useForm();
+  const { register, handleSubmit } = useForm<FormData>();
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: FormData) => {
     if (!data.query.trim()) return;
 
     setIsSearching(true);

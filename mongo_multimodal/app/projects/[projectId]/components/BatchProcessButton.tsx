@@ -14,7 +14,6 @@ const hasValidEmbedding = (item: ClientProjectData): boolean => {
 };
 
 export default function BatchProcessButton({
-  projectId,
   unprocessedItems
 }: {
   projectId: string;

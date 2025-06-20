@@ -1,6 +1,30 @@
-import { Db, ObjectId } from 'mongodb';
+import { Db, ObjectId, Document } from 'mongodb';
 import { generateLLMResponse } from './claude';
 import { generateMultimodalEmbedding } from './voyageai';
+
+// Define the interface for MongoDB result documents
+interface SearchResultDocument extends Document {
+  _id: ObjectId;
+  type: 'image' | 'document';
+  content: {
+    text?: string;
+    base64?: string;
+  };
+  metadata: {
+    filename: string;
+    mimeType: string;
+    size: number;
+    [key: string]: unknown;
+  };
+  analysis: {
+    description: string;
+    tags: string[];
+    insights: string[];
+    [key: string]: unknown;
+  };
+  createdAt: string;
+  score?: number;
+}
 
 export function formatDate(date: string | Date | undefined): string {
   if (!date) return '';
@@ -76,8 +100,8 @@ export async function doVectorImageSearch(type: 'text' | 'image', query: string,
 }
 
 export async function doVectorSearchAndAnalyse(
-  type: any,
-  query: any,
+  type: 'text' | 'image',
+  query: string,
   db: Db,
   paramsFound?: { projectId: string; },
   provider?: 'claude' | 'openai'
@@ -144,7 +168,7 @@ export async function doVectorSearchAndAnalyse(
           }
         }
       ])
-      .toArray();
+      .toArray() as SearchResultDocument[];
 
     console.log('Results:', results);
 
@@ -169,7 +193,19 @@ export async function doVectorSearchAndAnalyse(
 
     // Generate a comprehensive response using the selected LLM
     const selectedProvider = provider || (process.env.LLM_FOR_ANALYSIS as 'claude' | 'openai') || 'claude';
-    const llmResponse = await generateLLMResponse(selectedProvider, query, results, projectContext);
+
+    // Convert MongoDB Documents to proper SearchResult format
+    const searchResults = results.map(result => ({
+      _id: result._id.toString(),
+      type: result.type,
+      content: result.content,
+      metadata: result.metadata,
+      analysis: result.analysis,
+      createdAt: result.createdAt,
+      score: result.score
+    }));
+
+    const llmResponse = await generateLLMResponse(selectedProvider, query, searchResults, projectContext);
 
     // Merge LLM's analysis into each result
     const enrichedResults = results.map(result => ({

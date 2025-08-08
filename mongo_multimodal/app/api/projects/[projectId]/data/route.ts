@@ -45,7 +45,7 @@ export async function GET(
         _id: 1,
         projectId: 1,
         type: 1,
-        'content.text': 1, // Include text content for documents
+        'content.text': 1, // Include text content for documents (images exclude base64 here)
         metadata: 1,
         analysis: 1,
         embedding: 1,

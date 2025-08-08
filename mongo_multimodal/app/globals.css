@@ -6,6 +6,82 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Highlight.js dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .hljs {
+    background: #1f2937 !important;
+    color: #f9fafb !important;
+  }
+
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-literal,
+  .hljs-section,
+  .hljs-link {
+    color: #93c5fd !important;
+  }
+
+  .hljs-string {
+    color: #86efac !important;
+  }
+
+  .hljs-number,
+  .hljs-regexp,
+  .hljs-addition {
+    color: #fbbf24 !important;
+  }
+
+  .hljs-comment,
+  .hljs-quote,
+  .hljs-deletion {
+    color: #9ca3af !important;
+  }
+
+  .hljs-meta {
+    color: #f472b6 !important;
+  }
+}
+
+/* Custom markdown styles for better readability */
+.prose {
+  /* Ensure proper text color inheritance */
+  --tw-prose-body: inherit;
+  --tw-prose-headings: inherit;
+  --tw-prose-lead: inherit;
+  --tw-prose-links: #3b82f6;
+  --tw-prose-bold: inherit;
+  --tw-prose-counters: #6b7280;
+  --tw-prose-bullets: #6b7280;
+  --tw-prose-hr: #e5e7eb;
+  --tw-prose-quotes: #374151;
+  --tw-prose-quote-borders: #e5e7eb;
+  --tw-prose-captions: #6b7280;
+  --tw-prose-code: #374151;
+  --tw-prose-pre-code: #e5e7eb;
+  --tw-prose-pre-bg: #f3f4f6;
+  --tw-prose-th-borders: #d1d5db;
+  --tw-prose-td-borders: #e5e7eb;
+}
+
+.dark .prose {
+  --tw-prose-body: inherit;
+  --tw-prose-headings: inherit;
+  --tw-prose-lead: inherit;
+  --tw-prose-links: #60a5fa;
+  --tw-prose-bold: inherit;
+  --tw-prose-counters: #9ca3af;
+  --tw-prose-bullets: #9ca3af;
+  --tw-prose-hr: #374151;
+  --tw-prose-quotes: #d1d5db;
+  --tw-prose-quote-borders: #374151;
+  --tw-prose-captions: #9ca3af;
+  --tw-prose-code: #d1d5db;
+  --tw-prose-pre-code: #f3f4f6;
+  --tw-prose-pre-bg: #1f2937;
+  --tw-prose-th-borders: #4b5563;
+  --tw-prose-td-borders: #374151;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

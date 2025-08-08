@@ -36,6 +36,121 @@ export function formatDate(date: string | Date | undefined): string {
   return dateObj.toISOString().split('T')[0];
 }
 
+export async function doPaginatedVectorSearch(
+  db: Db,
+  projectId: string,
+  query: string,
+  type: 'text' | 'image',
+  page: number,
+  limit: number
+) {
+  try {
+    const startTime = Date.now();
+
+    const queryEmbedding = await generateMultimodalEmbedding(
+      { text: type === 'text' ? query : undefined, base64: type === 'image' ? query : undefined },
+      'query'
+    );
+
+    const similarityThreshold = 0.65;
+    const vectorFetchLimit = Math.max(200, page * limit + 50);
+
+    // Basic tokenization of query for lightweight textual boosting
+    const tokens = (query || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(t => t.length >= 3);
+
+    // Prefer description and tags; ignore filenames for relevance
+    const textBoostExpressions = tokens.map((t) => ({
+      $cond: [
+        { $regexMatch: { input: '$analysis.description', regex: t, options: 'i' } },
+        0.05,
+        0,
+      ],
+    }));
+
+    const facetPipeline: any[] = [
+      {
+        $vectorSearch: {
+          index: 'vector_index',
+          path: 'embedding',
+          queryVector: queryEmbedding,
+          filter: { projectId: new ObjectId(projectId) },
+          limit: vectorFetchLimit,
+          numCandidates: vectorFetchLimit * 4,
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          type: 1,
+          content: 1,
+          metadata: 1,
+          analysis: 1,
+          createdAt: 1,
+          score: { $meta: 'vectorSearchScore' },
+        },
+      },
+      { $match: { score: { $gte: similarityThreshold } } },
+      ...(tokens.length > 0
+        ? [{
+            $addFields: {
+              textBoost: { $sum: textBoostExpressions },
+              finalScore: { $add: ['$score', { $sum: textBoostExpressions }] },
+            },
+          }]
+        : []),
+      { $sort: tokens.length > 0 ? { finalScore: -1 } : { score: -1 } },
+      {
+        $facet: {
+          paginated: [
+            { $skip: Math.max(0, (page - 1) * limit) },
+            { $limit: limit },
+          ],
+          total: [ { $count: 'total' } ],
+        },
+      },
+    ];
+
+    const facetResult = await db.collection('projectData').aggregate(facetPipeline).toArray();
+    const facet = facetResult[0] || { paginated: [], total: [] };
+    const results: Array<{
+      _id: ObjectId;
+      type: 'image' | 'document';
+      content?: { text?: string; base64?: string };
+      metadata: { filename: string; mimeType: string; size: number };
+      analysis: { description: string; tags: string[]; insights: string[] };
+      createdAt: string;
+      score: number;
+    }> = facet.paginated;
+    const total = facet.total?.[0]?.total || 0;
+
+    const endTime = Date.now();
+    const timeTaken = endTime - startTime;
+
+    return {
+      results: results.map(result => ({
+        _id: result._id,
+        type: result.type,
+        content: result.type === 'image' ? { base64: undefined } : { text: result.content?.text },
+        metadata: result.metadata,
+        analysis: result.analysis,
+        createdAt: result.createdAt,
+        score: result.score,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      timeTaken,
+    };
+  } catch (error) {
+    console.error('Error performing paginated vector search:', error);
+    throw error;
+  }
+}
+
 export async function doVectorImageSearch(type: 'text' | 'image', query: string, db: Db) {
   try {
     console.log('Query:', query, type);

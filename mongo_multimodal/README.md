@@ -1,16 +1,19 @@
 # MongoDB Multi-Modal Vector Search Application
 
-A powerful enterprise-grade application that enables semantic search across visual and textual data using MongoDB Atlas Vector Search, Claude AI, and VoyageAI. Transform your charts, diagrams, PDFs, and images into searchable knowledge.
+A powerful enterprise-grade application that enables semantic search across visual and textual data using MongoDB Atlas Vector Search, LangGraph, and the Vercel AI SDK. Transform your charts, diagrams, PDFs, and images into searchable knowledge and interact with it through a powerful AI agent.
 
 ## 🚀 Features
 
-- **Multi-Modal Search**: Search across images, PDFs, and documents using natural language or visual queries
-- **AI-Powered Analysis**: Claude AI analyzes visual content and extracts meaningful insights
-- **Vector Embeddings**: VoyageAI generates 1024-dimensional embeddings for semantic similarity
-- **MongoDB Atlas Integration**: Scalable vector search with MongoDB's native capabilities
-- **Real-time Processing**: Automatic embedding generation and content analysis
-- **Project Organization**: Group related documents into searchable projects
-- **Interactive Chat Interface**: Natural conversation with your visual data
+- **Three Modes of Interaction**:
+  - **Search Mode**: Perform direct, paginated vector searches and view results instantly.
+  - **Chat Mode**: Engage in a conversational Q&A with your data.
+  - **Agent Mode**: Ask complex questions that require planning, tool use, and web search.
+- **AI-Powered Agent**: A LangGraph-powered agent that can reason, plan, and use tools to answer complex queries.
+- **Multi-Modal Search**: Search across images, PDFs, and documents using natural language or visual queries.
+- **AI-Powered Analysis**: Claude AI analyzes visual content and extracts meaningful insights.
+- **Vector Embeddings**: VoyageAI generates 1024-dimensional embeddings for semantic similarity.
+- **MongoDB Atlas Integration**: Scalable vector search with MongoDB's native capabilities.
+- **Project Organization**: Group related documents into searchable projects.
 
 ## 📋 Prerequisites
 
@@ -19,6 +22,8 @@ A powerful enterprise-grade application that enables semantic search across visu
 - API Keys:
   - [Anthropic Claude API key](https://console.anthropic.com/)
   - [VoyageAI API key](https://dash.voyageai.com/)
+  - [BraveSearch API key](https://brave.com/search/api/) for the agent's web search tool (FREE).
+  - [LangSmith API key](https://smith.langchain.com/) for tracing and debugging the agent (optional).
   - [OpenAI API key](https://platform.openai.com/) (optional)
 
 ## 🛠️ Installation
@@ -47,7 +52,13 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/multimodal?retry
 # AI Service API Keys
 VOYAGE_API_KEY=your-voyage-api-key
 ANTHROPIC_API_KEY=your-anthropic-api-key
+BRAVE_SEARCH_API_KEY=your-brave-search-api-key
 OPENAI_API_KEY=your-openai-api-key  # Optional
+
+# Agent Mode Configuration (optional)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your-langsmith-api-key
+LANGCHAIN_PROJECT=your-project-name # Optional: Helps organize runs in LangSmith
 
 # LLM Provider Selection
 LLM_FOR_ANALYSIS=claude  # Options: "claude" or "openai"
@@ -154,32 +165,24 @@ Processing includes:
 - Generating vector embeddings with VoyageAI
 - Extracting metadata and insights
 
-### Step 4: Search Your Data
+### Step 4: Interact with Your Data
 
-#### Project-Specific Search
-Within a project, use the chat interface:
+Within a project, you can interact with your data in three different modes using the tabbed interface:
 
-```
-Example queries:
-- "Show me revenue trends from Q3"
-- "Find all charts showing growth patterns"
-- "What are the key insights from the financial reports?"
-```
+#### Search Mode
+- **What it is**: A direct, fast vector search of your project's data.
+- **How to use**: Enter a query in the search bar and get a paginated list of the most relevant documents and images.
+- **Example**: Search for "all images of defective products" to quickly see all relevant images.
 
-#### Global Search
-From the homepage, use the global search bar:
+#### Chat Mode
+- **What it is**: A conversational Q&A interface for your project.
+- **How to use**: Ask questions in a natural, conversational way. The chat will maintain context.
+- **Example**: Ask "What were the main findings in the Q3 report?" and then follow up with "Can you summarize the key takeaways?".
 
-```
-Example queries:
-- "Find all manufacturing defect images across projects"
-- "Show compliance charts from any department"
-- "Locate molecular structures similar to compound X"
-```
-
-#### Visual Search
-1. Click the image icon in the search bar
-2. Upload or drag an image
-3. The system finds visually and semantically similar content
+#### Agent Mode
+- **What it is**: A powerful AI agent that can reason, create a plan, and use tools to answer complex questions.
+- **How to use**: Ask high-level research questions. The agent will use vector search and web search to find the answer.
+- **Example**: Ask "Compare the key findings of our internal reports on market trends with the latest articles on the web."
 
 ### Step 5: Interact with Results
 
@@ -192,18 +195,18 @@ Example queries:
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Next.js App   │────▶│  API Routes      │────▶│  MongoDB Atlas  │
-│   (React UI)    │     │  (Serverless)    │     │  (Vector DB)    │
+│   Next.js App   │────▶│   API Routes     │────▶│  MongoDB Atlas  │
+│ (React UI, AI SDK)│     │  (LangGraph Agent) │     │  (Vector DB)    │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │   AI Services       │
-                    ├─────────────────────┤
-                    │ • Claude AI         │
-                    │ • VoyageAI          │
-                    │ • OpenAI (optional) │
-                    └─────────────────────┘
+                               │                      ▲
+                               ▼                      │
+                    ┌─────────────────────┐     ┌─────────┴─────────┐
+                    │   AI Services       │     │       Tools       │
+                    ├─────────────────────┤     ├───────────────────┤
+                    │ • Claude AI         │     │ • Vector Search   │
+                    │ • VoyageAI          │     │ • Web Search      │
+                    │ • OpenAI (optional) │     │   (Tavily AI)     │
+                    └─────────────────────┘     └───────────────────┘
 ```
 
 ## 📁 Project Structure
@@ -211,9 +214,10 @@ Example queries:
 ```
 /app/                    # Next.js App Router
 ├── api/                 # Backend API routes
-│   ├── projects/       # Project CRUD operations
-│   ├── search/         # Global search endpoint
-│   └── vector-search/  # Vector similarity search
+│   ├── agent/          # LangGraph agent endpoint
+│   ├── chat/           # Vercel AI SDK chat endpoint
+│   ├── projects/       # Project CRUD and search operations
+│   └── ...
 ├── lib/                # Core utilities
 │   ├── mongodb.ts      # Database connection
 │   ├── claude.ts       # AI integrations

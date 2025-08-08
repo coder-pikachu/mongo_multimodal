@@ -36,7 +36,6 @@ export async function POST(
         tags: [],
         insights: [],
       },
-      embedding: [], // Will be populated by background job
       createdAt: new Date(),
       updatedAt: new Date(),
     };

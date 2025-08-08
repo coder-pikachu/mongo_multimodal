@@ -32,7 +32,8 @@ export const projectDataSchema = z.object({
     tags: z.array(z.string()),
     insights: z.array(z.string()),
   }),
-  embedding: z.array(z.number()).length(1024),
+  // Embedding is optional at creation time; will be added during processing
+  embedding: z.array(z.number()).length(1024).optional(),
 });
 
 export type CreateUserInput = z.infer<typeof userSchema>;

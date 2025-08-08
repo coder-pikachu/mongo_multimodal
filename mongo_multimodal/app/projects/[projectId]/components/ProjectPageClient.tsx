@@ -1,10 +1,15 @@
 'use client';
 
-import { ClientProject, ClientProjectData } from '@/types/clientTypes';
+import { ClientProject, ClientProjectData, SearchResult } from '@/types/clientTypes';
 import UploadButton from './UploadButton';
-import DataList from './DataList';
-import ChatInterface from './ChatInterface';
-import { Suspense } from 'react';
+import BatchProcessButton from './BatchProcessButton';
+import { useState } from 'react';
+import SearchView from './SearchView';
+import ChatView from './ChatView';
+import AgentView from './AgentView';
+import DataExplorerView from './DataExplorerView';
+import { SearchResultProvider } from './SearchResultContext';
+import ProjectHeader from './ProjectHeader';
 
 interface ProjectPageClientProps {
   project: ClientProject;
@@ -12,112 +17,128 @@ interface ProjectPageClientProps {
   projectId: string;
 }
 
-function LoadingSkeleton() {
-  return (
-    <div className="animate-pulse space-y-8">
-      <div>
-        <div className="h-8 bg-gray-200 rounded w-1/3 mb-2" />
-        <div className="h-4 bg-gray-200 rounded w-2/3" />
-      </div>
-      <div className="bg-blue-50/50 border border-blue-200/50 rounded-lg p-4">
-        <div className="space-y-4">
-          <div className="h-4 bg-blue-100 rounded w-3/4" />
-          <div className="h-4 bg-blue-100 rounded w-1/2" />
-          <div className="h-4 bg-blue-100 rounded w-2/3" />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="bg-white p-4 rounded-lg border border-gray-200">
-            <div className="h-48 mb-4 bg-gray-200 rounded-lg" />
-            <div className="space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-4 bg-gray-200 rounded w-1/2" />
-              <div className="h-4 bg-gray-200 rounded w-2/3" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+type Mode = 'search' | 'chat' | 'agent' | 'explorer';
+
+interface PaginatedResults {
+  results: SearchResult[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  timeTaken: number;
 }
 
 export default function ProjectPageClient({ project, data, projectId }: ProjectPageClientProps) {
+  const [mode, setMode] = useState<Mode>('search');
+  const [searchResults, setSearchResults] = useState<PaginatedResults | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const renderContent = () => {
+    switch (mode) {
+      case 'search':
+        return (
+          <SearchView
+            projectId={projectId}
+            onSelectResult={() => setMode('chat')}
+            onSelectForAgent={() => setMode('agent')}
+            searchResults={searchResults}
+            setSearchResults={setSearchResults}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+          />
+        );
+      case 'chat':
+        return <ChatView projectId={projectId} />;
+      case 'agent':
+        return <AgentView projectId={projectId} />;
+      case 'explorer':
+        return (
+          <DataExplorerView
+            projectId={projectId}
+            data={data}
+            onSelectForChat={() => setMode('chat')}
+            onSelectForAgent={() => setMode('agent')}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-[calc(100vh-10rem)]">
-        {/* Left Column (2/3 width) */}
-        <div className="lg:col-span-2 space-y-8 overflow-y-auto">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">{project.name}</h1>
-            <p className="text-gray-600">{project.description}</p>
-
-            {/* Sample Questions */}
-            {project.sampleQuestions && project.sampleQuestions.length > 0 && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="font-medium text-blue-800 mb-2">Try asking:</h3>
-                <div className="space-y-2">
-                  {project.sampleQuestions.map((question, index) => (
-                    <div key={index} className="text-sm text-blue-700 italic">
-                      &quot;{question}&quot;
-                    </div>
-                  ))}
-                </div>
+    <SearchResultProvider>
+      <div className="mx-auto px-4 pt-8">
+        <div className="flex flex-col h-[calc(100vh-6rem)]">
+          {/* Project Header with compact right actions */}
+          <ProjectHeader
+            project={project}
+            rightActions={
+              <div className="flex items-center gap-1">
+                <UploadButton projectId={projectId} asIcon />
+                <BatchProcessButton unprocessedItems={data} asIcon projectId={projectId} />
               </div>
-            )}
+            }
+          />
 
-            {/* Project Info Card */}
-            {/* <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
-                <div>
-                  <h3 className="font-medium text-blue-800">About This Project</h3>
-                  <p className="text-sm text-blue-700 mt-1">
-                    This project uses MongoDB&apos;s vector search capabilities to analyze and search across your documents and images.
-                    Upload content using the button below, then use the Research Assistant to ask questions about your content.
-                  </p>
-                  <div className="mt-2 text-sm text-blue-700">
-                    <p className="font-medium">Supported file types:</p>
-                    <ul className="list-disc pl-5 mt-1 space-y-1">
-                      <li>Images: JPEG, JPG</li>
-                      <li>Documents: PDF (up to 20MB) - automatically converted to images</li>
-                    </ul>
-                  </div>
-                  <div className="mt-2 text-sm text-blue-700">
-                    <p className="font-medium">Search capabilities:</p>
-                    <ul className="list-disc pl-5 mt-1 space-y-1">
-                      <li>Semantic search across text documents</li>
-                      <li>Image content analysis and search</li>
-                      <li>PDF document analysis (page by page)</li>
-                      <li>Multimodal queries combining text and images</li>
-                      <li>Contextual understanding of complex topics</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div> */}
-          </div>
-
-          <div className="flex justify-between items-center">
-            <UploadButton projectId={projectId} />
-            <div className="text-sm text-gray-500">
+          {/* Item Count Row */}
+          <div className="flex justify-end items-center mt-2 mb-2">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               {data.length} {data.length === 1 ? 'item' : 'items'} in this project
             </div>
           </div>
 
-          <Suspense fallback={<LoadingSkeleton />}>
-            <DataList projectId={projectId} data={data} />
-          </Suspense>
-        </div>
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              <button
+                onClick={() => setMode('search')}
+                className={`${
+                  mode === 'search'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Search
+              </button>
+              <button
+                onClick={() => setMode('chat')}
+                className={`${
+                  mode === 'chat'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Chat
+              </button>
+              <button
+                onClick={() => setMode('agent')}
+                className={`${
+                  mode === 'agent'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Agent
+              </button>
+              <button
+                onClick={() => setMode('explorer')}
+                className={`${
+                  mode === 'explorer'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Data Explorer
+              </button>
+            </nav>
+          </div>
 
-        {/* Right Column (1/3 width) */}
-        <div className="h-full lg:col-span-2">
-          <ChatInterface
-            projectId={projectId}
-            sampleQuestions={project.sampleQuestions || []}
-          />
+          {/* Tab Content */}
+          <div className="flex-grow overflow-y-auto pt-6">
+              {renderContent()}
+        </div>
         </div>
       </div>
-    </div>
+    </SearchResultProvider>
   );
 }

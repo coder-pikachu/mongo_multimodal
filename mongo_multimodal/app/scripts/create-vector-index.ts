@@ -9,12 +9,12 @@ import { getDb } from '../lib/mongodb';
 async function createVectorIndex() {
   try {
     console.log('Creating vector search index...');
-    
+
     const db = await getDb();
-    
+
     // Get the projectData collection
     const collection = db.collection('projectData');
-    
+
     // Define the vector search index
     const indexDefinition = {
       name: 'vector_index',
@@ -36,7 +36,7 @@ async function createVectorIndex() {
       // Check if index already exists
       const indexes = await collection.listSearchIndexes().toArray();
       const existingIndex = indexes.find(idx => idx.name === 'vector_index');
-      
+
       if (existingIndex) {
         console.log('Vector index already exists:', existingIndex.name);
         console.log('Index definition:', JSON.stringify(existingIndex, null, 2));
@@ -46,18 +46,19 @@ async function createVectorIndex() {
       // Create the search index
       console.log('Creating new vector index...');
       await collection.createSearchIndex(indexDefinition);
-      
+
       console.log('Vector search index created successfully!');
       console.log('Index name: vector_index');
       console.log('Collection: projectData');
       console.log('Dimensions: 1024');
       console.log('Similarity: cosine');
-      
+
       console.log('\nNote: It may take a few minutes for the index to be fully active.');
       console.log('You can check the index status in MongoDB Atlas UI.');
-      
-    } catch (error: any) {
-      if (error.code === 'IndexAlreadyExists' || error.message?.includes('already exists')) {
+
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      if (err?.code === 'IndexAlreadyExists' || err?.message?.includes('already exists')) {
         console.log('Vector index already exists');
       } else {
         throw error;
@@ -66,15 +67,15 @@ async function createVectorIndex() {
 
     // Also ensure regular indexes exist
     console.log('\nCreating regular indexes...');
-    
+
     // Create compound index for projectId queries
     await collection.createIndex({ projectId: 1, createdAt: -1 });
     console.log('Created index on projectId and createdAt');
-    
+
     // Create index for processedAt to find unprocessed items
     await collection.createIndex({ processedAt: 1 });
     console.log('Created index on processedAt');
-    
+
     // Create index for type field
     await collection.createIndex({ type: 1 });
     console.log('Created index on type');
@@ -85,7 +86,7 @@ async function createVectorIndex() {
     console.log('Created index on projects.createdAt');
 
     console.log('\nAll indexes created successfully!');
-    
+
   } catch (error) {
     console.error('Failed to create vector index:', error);
     console.error('\nTroubleshooting tips:');

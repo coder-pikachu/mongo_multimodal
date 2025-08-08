@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/mongodb';
-import { doVectorSearchAndAnalyse } from '@/lib/utils';
+import { doVectorSearchAndAnalyse, doPaginatedVectorSearch } from '@/lib/utils';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Define error interface for better type safety
@@ -18,13 +18,20 @@ export async function POST(
   {
     const paramsFound = await params;
     const db = await getDb();
-    const { query, type = 'text' } = await request.json();
+    const { query, type = 'text', mode = 'agent', page = 1, limit = 12 } = await request.json();
 
     if ( !query )
     {
       return NextResponse.json( { error: 'Query is required' }, { status: 400 } );
     }
 
+    // "Search" mode for direct, paginated results
+    if (mode === 'search') {
+      const searchResults = await doPaginatedVectorSearch(db, paramsFound.projectId, query, type, page, limit);
+      return NextResponse.json(searchResults);
+    }
+
+    // "Agent" mode for analysis and complex responses
     // Generate embedding for the search query and perform vector search
     try {
       const { results, analysis } = await doVectorSearchAndAnalyse( type, query, db, paramsFound );

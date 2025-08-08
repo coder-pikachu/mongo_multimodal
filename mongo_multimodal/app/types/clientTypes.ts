@@ -37,3 +37,14 @@ export interface ClientProjectData {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface SearchResult extends Omit<ClientProjectData, 'embedding'> {
+  score: number;
+}
+
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: Date;
+}

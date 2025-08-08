@@ -2,8 +2,9 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { UploadIcon } from 'lucide-react';
 
-export default function UploadButton({ projectId }: { projectId: string }) {
+export default function UploadButton({ projectId, asIcon = false }: { projectId: string; asIcon?: boolean }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
   const [pdfProcessingStatus, setPdfProcessingStatus] = useState<string>('');
@@ -42,10 +43,10 @@ export default function UploadButton({ projectId }: { projectId: string }) {
     try {
       // Dynamic import to avoid SSR issues
       const { validatePDFFile, extractPDFData, convertPDFToImages } = await import('@/lib/pdf-to-image');
-      
+
       // Validate PDF file
       validatePDFFile(file);
-      
+
       setPdfProcessingStatus(`Processing ${file.name}...`);
       setUploadProgress(prev => ({
         ...prev,
@@ -54,7 +55,7 @@ export default function UploadButton({ projectId }: { projectId: string }) {
 
       // Extract PDF data
       const pdfData = await extractPDFData(file);
-      
+
       // Convert PDF to images
       setPdfProcessingStatus(`Converting ${file.name} pages to images...`);
       const images = await convertPDFToImages(pdfData, {
@@ -73,11 +74,11 @@ export default function UploadButton({ projectId }: { projectId: string }) {
       for (let i = 0; i < images.length; i++) {
         const pageNum = i + 1;
         setPdfProcessingStatus(`Uploading page ${pageNum} of ${totalPages} from ${file.name}...`);
-        
+
         // Convert data URL to blob
         const response = await fetch(images[i].dataUrl);
         const blob = await response.blob();
-        
+
         // Create a file from the blob
         const pageFile = new File([blob], `${file.name.replace('.pdf', '')}_page_${pageNum}.jpg`, {
           type: 'image/jpeg'
@@ -85,7 +86,7 @@ export default function UploadButton({ projectId }: { projectId: string }) {
 
         // Upload the page
         await uploadFile(pageFile);
-        
+
         // Update progress
         const progress = 30 + ((i + 1) / totalPages) * 70;
         setUploadProgress(prev => ({
@@ -95,7 +96,7 @@ export default function UploadButton({ projectId }: { projectId: string }) {
       }
 
       setPdfProcessingStatus('');
-      
+
     } catch (error) {
       console.error(`PDF processing error for ${file.name}:`, error);
       setPdfProcessingStatus('');
@@ -113,7 +114,7 @@ export default function UploadButton({ projectId }: { projectId: string }) {
 
     try {
       setIsUploading(true);
-      
+
       // Initialize progress for each file
       const initialProgress = files.reduce((acc, file) => ({
         ...acc,
@@ -151,7 +152,7 @@ export default function UploadButton({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className={asIcon ? '' : 'space-y-4'}>
       <input
         ref={fileInputRef}
         type="file"
@@ -163,9 +164,14 @@ export default function UploadButton({ projectId }: { projectId: string }) {
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={isUploading}
-        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
+        className={asIcon ? 'p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400'}
+        title={asIcon ? (isUploading ? `Uploading (${getOverallProgress()}%)` : 'Upload Files') : undefined}
       >
-        {isUploading ? `Uploading (${getOverallProgress()}%)` : 'Upload Files'}
+        {asIcon ? (
+          <UploadIcon className="w-4 h-4" />
+        ) : (
+          isUploading ? `Uploading (${getOverallProgress()}%)` : 'Upload Files'
+        )}
       </button>
 
       {/* PDF Processing Status */}
@@ -176,7 +182,7 @@ export default function UploadButton({ projectId }: { projectId: string }) {
       )}
 
       {/* Progress indicators */}
-      {Object.entries(uploadProgress).length > 0 && (
+      {!asIcon && Object.entries(uploadProgress).length > 0 && (
         <div className="space-y-2">
           {Object.entries(uploadProgress).map(([filename, progress]) => (
             <div key={filename} className="text-sm">

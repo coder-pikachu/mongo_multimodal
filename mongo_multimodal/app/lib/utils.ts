@@ -52,7 +52,7 @@ export async function doPaginatedVectorSearch(
       'query'
     );
 
-    const similarityThreshold = 0.65;
+    const similarityThreshold = 0.4;
     const vectorFetchLimit = Math.max(200, page * limit + 50);
 
     // Basic tokenization of query for lightweight textual boosting
@@ -176,7 +176,6 @@ export async function doVectorImageSearch(type: 'text' | 'image', query: string,
             index: 'vector_index',
             "path": "embedding",
             "queryVector": queryEmbedding,
-
             "exact": searchConfig.exact,
             "limit": searchConfig.limit,
             "numCandidates": searchConfig.numCandidates,
@@ -238,7 +237,7 @@ export async function doVectorSearchAndAnalyse(
       // numCandidates: 20-30x limit for optimal recall (MongoDB 2024 best practice)
       numCandidates: isProjectSpecific ? 150 : 300,
       // Slightly higher threshold for better quality
-      similarityThreshold: 0.65
+      similarityThreshold: 0.2
     };
 
     // Perform vector search using MongoDB Atlas

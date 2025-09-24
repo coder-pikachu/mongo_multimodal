@@ -163,8 +163,8 @@ export default function ChatView({ projectId }: ChatViewProps) {
                                 {m.role === 'user' ? (
                                     <p className="whitespace-pre-wrap">{m.content}</p>
                                 ) : (
-                                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                                        <ReactMarkdown
+                                    <div className="prose prose-slate prose-base dark:prose-invert max-w-none">
+                                            <ReactMarkdown
                                             remarkPlugins={[remarkGfm]}
                                             rehypePlugins={[rehypeHighlight]}
                                             components={{
@@ -185,9 +185,9 @@ export default function ChatView({ projectId }: ChatViewProps) {
                                                 strong: ({children}) => <strong className="font-semibold">{children}</strong>,
                                                 em: ({children}) => <em className="italic">{children}</em>,
                                             }}
-                                        >
-                                            {m.content}
-                                        </ReactMarkdown>
+                                            >
+                                                {m.content}
+                                            </ReactMarkdown>
                                     </div>
                                 )}
                             </div>

@@ -2,7 +2,7 @@
 'use client'
 import { useState } from "react";
 import { SearchResult } from "@/types/clientTypes";
-import { Search, Eye, MessageSquare, Clock, Target, BrainCircuit } from "lucide-react";
+import { Search, Eye, MessageSquare, Clock, Target, BrainCircuit, X, Loader2 } from "lucide-react";
 import { useEffect } from 'react';
 import { useSearchResult } from "./SearchResultContext";
 
@@ -37,30 +37,55 @@ export default function SearchView({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { selectedResult, setSelectedResult } = useSearchResult();
+    const [previewItem, setPreviewItem] = useState<SearchResult | null>(null);
+    const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
 
-    // Inline thumbnail component to lazy fetch image data
+    // Thumbnail component that fetches image on-demand
     function ImageThumbnail({ id, mime }: { id: string; mime: string }) {
         const [src, setSrc] = useState<string | null>(null);
-        useEffect(() => {
-            let isMounted = true;
-            (async () => {
-                try {
-                    const resp = await fetch(`/api/projects/data/${id}/content`);
-                    if (!resp.ok) return;
-                    const data = await resp.json();
-                    if (data?.content?.base64 && isMounted) {
-                        setSrc(`data:${mime};base64,${data.content.base64}`);
-                    }
-                } catch {}
-            })();
-            return () => { isMounted = false };
-        }, [id, mime]);
+        const [isLoadingThumb, setIsLoadingThumb] = useState(false);
+        const [thumbError, setThumbError] = useState<string | null>(null);
+
+        const loadThumbnail = async () => {
+            if (src || isLoadingThumb) return;
+            setThumbError(null);
+            setIsLoadingThumb(true);
+            try {
+                const resp = await fetch(`/api/projects/data/${id}/content`);
+                if (!resp.ok) throw new Error('Failed to load thumbnail');
+                const data = await resp.json();
+                if (data?.content?.base64) {
+                    setSrc(`data:${mime};base64,${data.content.base64}`);
+                } else {
+                    throw new Error('No image data');
+                }
+            } catch (e: unknown) {
+                const err = e as Error;
+                setThumbError(err.message);
+            } finally {
+                setIsLoadingThumb(false);
+            }
+        };
+
         return (
             <div className="mt-2">
                 {src ? (
                     <img src={src} alt="thumbnail" className="max-w-xs max-h-32 object-contain rounded border" />
                 ) : (
-                    <div className="h-20 w-28 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="h-24 w-36 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center">
+                        <button
+                            onClick={loadThumbnail}
+                            className="px-2 py-1 text-xs bg-white dark:bg-gray-800 border rounded shadow-sm hover:bg-gray-50 dark:hover:bg-gray-900 flex items-center gap-1"
+                            disabled={isLoadingThumb}
+                            title="Load thumbnail"
+                        >
+                            {isLoadingThumb ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
+                            {isLoadingThumb ? 'Loading…' : 'Load thumbnail'}
+                        </button>
+                    </div>
+                )}
+                {thumbError && (
+                    <p className="text-xs text-red-500 mt-1">{thumbError}</p>
                 )}
             </div>
         );
@@ -105,9 +130,30 @@ export default function SearchView({
         setSelectedResult(result);
     };
 
-    const handlePreview = (result: SearchResult) => {
-        // TODO: Open result in preview modal
-        console.log('Preview result:', result);
+    const handlePreview = async (result: SearchResult) => {
+        // For images, ensure base64 content is loaded before opening the modal
+        if (result.type === 'image' && !result.content?.base64) {
+            setLoadingPreviewId(result._id);
+            try {
+                const resp = await fetch(`/api/projects/data/${result._id}/content`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const enriched: SearchResult = {
+                        ...result,
+                        content: { ...result.content, base64: data?.content?.base64 },
+                    } as SearchResult;
+                    setPreviewItem(enriched);
+                } else {
+                    setPreviewItem(result);
+                }
+            } catch {
+                setPreviewItem(result);
+            } finally {
+                setLoadingPreviewId(null);
+            }
+        } else {
+            setPreviewItem(result);
+        }
     };
 
     return (
@@ -186,10 +232,15 @@ export default function SearchView({
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => handlePreview(result)}
-                                        className="p-1 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded"
+                                        className="p-1 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded disabled:opacity-50"
                                         title="Preview"
+                                        disabled={loadingPreviewId === result._id}
                                     >
-                                        <Eye className="h-4 w-4" />
+                                        {loadingPreviewId === result._id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Eye className="h-4 w-4" />
+                                        )}
                                     </button>
                                     <button
                                         onClick={() => handleResultSelect(result)}
@@ -241,7 +292,7 @@ export default function SearchView({
                                     </div>
                                 )}
 
-                                {/* Image thumbnail placeholder; actual base64 fetched lazily */}
+                                {/* Image thumbnail loads on demand to avoid excessive /content calls */}
                                 {result.type === 'image' && (
                                     <ImageThumbnail id={result._id} mime={result.metadata?.mimeType || 'image/jpeg'} />
                                 )}
@@ -300,6 +351,78 @@ export default function SearchView({
                     >
                         Go to Chat
                     </button>
+                </div>
+            )}
+
+            {/* Preview Modal */}
+            {previewItem && (
+                <div
+                    className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+                    onClick={() => setPreviewItem(null)}
+                >
+                    <div
+                        className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl max-h-[90vh] w-full mx-4 overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                            <div>
+                                <h3 className="font-bold text-lg">{previewItem.metadata?.filename || 'Preview'}</h3>
+                                <p className="text-sm text-gray-500">{previewItem.type}</p>
+                            </div>
+                            <button
+                                onClick={() => setPreviewItem(null)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="flex-grow overflow-auto p-4">
+                            {previewItem.type === 'image' && previewItem.content?.base64 ? (
+                                <img
+                                    src={`data:${previewItem.metadata?.mimeType};base64,${previewItem.content.base64}`}
+                                    alt={previewItem.metadata?.filename || 'image'}
+                                    className="max-w-full h-auto rounded mx-auto"
+                                />
+                            ) : previewItem.type === 'document' ? (
+                                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded">
+                                    <pre className="whitespace-pre-wrap text-sm font-mono">{previewItem.content?.text}</pre>
+                                </div>
+                            ) : (
+                                <pre className="bg-gray-100 dark:bg-gray-700 p-4 rounded text-sm">
+                                    {JSON.stringify(previewItem.content, null, 2)}
+                                </pre>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+                            <button
+                                onClick={() => {
+                                    setSelectedResult(previewItem);
+                                    onSelectResult();
+                                    setPreviewItem(null);
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            >
+                                <MessageSquare className="h-4 w-4" />
+                                Ask Questions in Chat
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSelectedResult(previewItem);
+                                    onSelectForAgent();
+                                    setPreviewItem(null);
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+                            >
+                                <BrainCircuit className="h-4 w-4" />
+                                Research with Agent
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -1,4 +1,5 @@
 import { anthropic } from '@ai-sdk/anthropic';
+import { openai } from '@ai-sdk/openai';
 import { streamText, tool, stepCountIs } from 'ai';
 import { getDb } from '@/lib/mongodb';
 import { doPaginatedVectorSearch } from '@/lib/utils';
@@ -104,10 +105,11 @@ async function analyzeImage(projectId: string, dataId: string, userQuery: string
 - Highlight any issues, recommendations, or notable observations
 - Be concise and avoid describing basic visual elements
 - If the image contains text, extract and summarize key information`;
+  const selectedProvider = (process.env.LLM_FOR_ANALYSIS as 'claude' | 'openai') || 'claude';
 
     // Create a message with the image for Claude to analyze
     const analysisResult = await streamText({
-      model: anthropic('claude-3-5-sonnet-20240620'),
+      model: selectedProvider === 'claude' ? anthropic('claude-3-5-sonnet-20240620') : openai('gpt-4o'),
       maxOutputTokens: 4096,
       messages: [
         {
@@ -153,34 +155,8 @@ async function analyzeImage(projectId: string, dataId: string, userQuery: string
 }
 
 
-// Simple tool function for web search using BraveSearch API
-async function searchWeb(query: string) {
-  if (!process.env.BRAVE_SEARCH_API_KEY) {
-    return "Web search not available - API key not configured";
-  }
-
-  try {
-    const url = new URL('https://api.search.brave.com/res/v1/web/search');
-    url.searchParams.append('q', query);
-    url.searchParams.append('count', '3');
-    url.searchParams.append('result_filter', 'web');
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
-        'X-Subscription-Token': process.env.BRAVE_SEARCH_API_KEY,
-      },
-    });
-
-    const data = await response.json();
-    return JSON.stringify(data.web?.results?.slice(0, 3) || []);
-  } catch (error) {
-    console.error('Web search error:', error);
-    return "Web search failed";
-  }
-}
+// Placeholder to avoid unused var errors when web search tool is disabled
+async function _searchWebHelper(_query: string) { return 'disabled'; }
 
 // Tool: fetch stored analysis for a specific projectData item
 async function getProjectDataAnalysis(projectId: string, dataId: string) {
@@ -300,9 +276,10 @@ export async function POST(req: Request) {
       name: project?.name,
       description: project?.description
     };
+    const selectedProvider = (process.env.LLM_FOR_ANALYSIS as 'claude' | 'openai') || 'claude';
 
     const result = await streamText({
-      model: anthropic('claude-3-5-sonnet-20240620'),
+      model: selectedProvider === 'claude' ? anthropic('claude-3-5-sonnet-20240620') : openai('gpt-4o'),
       maxOutputTokens: 8192,
       system: `You are Claude, an expert AI research assistant specializing in multimodal data analysis and research.
 
@@ -327,11 +304,6 @@ You have access to three powerful research tools:
 - Can analyze up to ${maxAnalyses} images per query (${analysisDepth} analysis mode)
 - Provides targeted analysis based on what the user is specifically asking about
 
-### 3. 🌐 searchWeb
-- Search the internet for additional context and information
-- Use to supplement project data with external knowledge
-- Helpful for research, comparisons, and best practices
-
 ### 4. 📄 projectDataAnalysis
 - Fetch the stored analysis for a specific project item by id
 - Returns description, tags, insights, facets, and metadata (no base64) for precise reasoning
@@ -350,12 +322,13 @@ General approach:
 5. Decide dynamically whether to deepen with more calls or conclude when sufficient evidence is found.
 
 ## Response Format
-Keep responses concise and solution-focused:
+Keep responses concise, solution-focused, and beautifully formatted in Markdown:
 
-- Lead with the answer.
-- Use short bullets; bold only key data points.
-- Do not narrate the process or apologize.
-- If evidence is insufficient, say so briefly and make 1-2 next-step searches.
+- Lead with the answer
+- Use short bullets and bold only key data points
+- Include fenced code blocks (\`\`\`lang) for structured snippets (e.g., JSON, steps, or formulas)
+- Tables are welcome for comparisons; use blockquotes for callouts
+- If evidence is insufficient, say so briefly and make 1-2 next-step searches
 
 ## Analysis Standards
 - Solve the user's problem directly.
@@ -419,16 +392,16 @@ Remember: You're here to **solve the user's specific query**, not provide educat
             return await getProjectDataAnalysis(projectId, dataId);
           },
         }),
-        searchWeb: tool({
-          description: 'Search the web for additional information',
-          inputSchema: z.object({
-            query: z.string().describe('The web search query'),
-          }),
-          execute: async ({ query }) => {
-            console.log('Tool call: searchWeb with query:', query);
-            return await searchWeb(query);
-          },
-        }),
+        // searchWeb: tool({
+        //   description: 'Search the web for additional information',
+        //   inputSchema: z.object({
+        //     query: z.string().describe('The web search query'),
+        //   }),
+        //   execute: async ({ query }) => {
+        //     console.log('Tool call: searchWeb with query:', query);
+        //     return await searchWeb(query);
+        //   },
+        // }),
       },
       onFinish: async ({ text }) => {
         // Save the assistant's response

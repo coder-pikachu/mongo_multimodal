@@ -296,7 +296,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         {m.role === 'user' ? (
                             <p className="whitespace-pre-wrap">{m.content}</p>
                         ) : (
-                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <div className="prose prose-slate prose-base dark:prose-invert max-w-none">
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm]}
                                     rehypePlugins={[rehypeHighlight]}

@@ -1,6 +1,7 @@
 'use client'
 import { ClientProjectData } from "@/types/clientTypes";
 import DataList from './DataList';
+import BatchProcessButton from './BatchProcessButton';
 import { Database, Filter, Wand2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -13,15 +14,28 @@ interface DataExplorerViewProps {
 
 export default function DataExplorerView({ projectId, data, onSelectForChat, onSelectForAgent }: DataExplorerViewProps) {
     const [showUnanalyzedOnly, setShowUnanalyzedOnly] = useState(false);
+    const [showUnembeddedOnly, setShowUnembeddedOnly] = useState(false);
 
     const isUnanalyzed = (d: ClientProjectData) => d.type === 'image' && !(d.analysis?.description && d.analysis.description.trim().length > 0);
 
+    const isUnembedded = (d: ClientProjectData) => {
+        return !(d.embedding && Array.isArray(d.embedding) && d.embedding.length > 0 && d.embedding.every(val => typeof val === 'number'));
+    };
+
     const filtered = useMemo(() => {
-        if (!showUnanalyzedOnly) return data;
-        return data.filter(isUnanalyzed);
-    }, [data, showUnanalyzedOnly]);
+        let result = data;
+        if (showUnanalyzedOnly) {
+            result = result.filter(isUnanalyzed);
+        }
+        if (showUnembeddedOnly) {
+            result = result.filter(isUnembedded);
+        }
+        return result;
+    }, [data, showUnanalyzedOnly, showUnembeddedOnly]);
 
     const unanalyzedCount = useMemo(() => data.filter(isUnanalyzed).length, [data]);
+    const unembeddedCount = useMemo(() => data.filter(isUnembedded).length, [data]);
+    const unembeddedItems = useMemo(() => data.filter(isUnembedded), [data]);
 
     const handleBulkAnalyze = async () => {
         try {
@@ -53,7 +67,7 @@ export default function DataExplorerView({ projectId, data, onSelectForChat, onS
                     <Database className="h-5 w-5 text-gray-500" />
                     <h2 className="text-2xl font-bold">Data Explorer</h2>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                     <button
                         onClick={() => setShowUnanalyzedOnly(v => !v)}
                         className={`px-3 py-1 text-xs rounded border ${showUnanalyzedOnly ? 'bg-blue-600 text-white border-blue-600' : 'bg-transparent text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600'}`}
@@ -63,13 +77,32 @@ export default function DataExplorerView({ projectId, data, onSelectForChat, onS
                         Unanalyzed only
                     </button>
                     <button
-                        onClick={handleBulkAnalyze}
-                        className="px-3 py-1 text-xs rounded bg-amber-500 text-white hover:bg-amber-600"
-                        title="Analyze all filtered images and generate tags/description"
+                        onClick={() => setShowUnembeddedOnly(v => !v)}
+                        className={`px-3 py-1 text-xs rounded border ${showUnembeddedOnly ? 'bg-green-600 text-white border-green-600' : 'bg-transparent text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600'}`}
+                        title="Show only items without embeddings"
                     >
-                        <Wand2 className="h-3 w-3 inline mr-1" />
-                        Analyze {unanalyzedCount} images
+                        <Filter className="h-3 w-3 inline mr-1" />
+                        Unembedded only
                     </button>
+                    {unanalyzedCount > 0 && (
+                        <button
+                            onClick={handleBulkAnalyze}
+                            className="px-3 py-1 text-xs rounded bg-amber-500 text-white hover:bg-amber-600"
+                            title="Analyze all filtered images and generate tags/description"
+                        >
+                            <Wand2 className="h-3 w-3 inline mr-1" />
+                            Analyze {unanalyzedCount} images
+                        </button>
+                    )}
+                    {unembeddedCount > 0 && (
+                        <div className="inline-block">
+                            <BatchProcessButton
+                                projectId={projectId}
+                                unprocessedItems={unembeddedItems}
+                                asIcon={false}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="flex-grow overflow-y-auto">

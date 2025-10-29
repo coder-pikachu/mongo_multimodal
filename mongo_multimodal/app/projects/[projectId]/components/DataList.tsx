@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ClientProjectData } from '@/types/clientTypes';
 import { Eye, Trash2, MessageSquare, BrainCircuit, Image as ImageIcon, X, Loader2, Wand2 } from 'lucide-react';
 import { useSearchResult } from './SearchResultContext';
+import ProcessButton from './ProcessButton';
 
 interface DataListProps {
   projectId: string;
@@ -12,6 +13,14 @@ interface DataListProps {
 }
 
 const ITEMS_PER_PAGE = 12;
+
+// Utility to check if an embedding is valid
+const hasValidEmbedding = (item: ClientProjectData): boolean => {
+  return !!item.embedding &&
+         Array.isArray(item.embedding) &&
+         item.embedding.length > 0 &&
+         item.embedding.every(val => typeof val === 'number');
+};
 
 export default function DataList({ data, onSelectForChat, onSelectForAgent }: DataListProps) {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -165,6 +174,15 @@ export default function DataList({ data, onSelectForChat, onSelectForAgent }: Da
                   <p className="text-xs text-gray-400">
                     {(item.metadata.size / 1024).toFixed(2)} KB
                   </p>
+                  {hasValidEmbedding(item) ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mt-1">
+                      Embedded
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 mt-1">
+                      No Embedding
+                    </span>
+                  )}
                 </div>
               </div>
                 <button
@@ -194,34 +212,39 @@ export default function DataList({ data, onSelectForChat, onSelectForAgent }: Da
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => handleSelectForChat(item)}
-                className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-800"
-                title="Ask questions in Chat"
-              >
-                <MessageSquare className="h-3 w-3" />
-                Chat
-              </button>
-                {item.type === 'image' && (!item.analysis?.description || item.analysis.description.trim().length === 0) && (
-                  <button
-                    onClick={() => handleAnalyze(item)}
-                    disabled={loadingImage === item._id}
-                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-100 dark:hover:bg-amber-800"
-                    title="Analyze image to generate tags & description"
-                  >
-                    {loadingImage === item._id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-                    Analyze
-                  </button>
-                )}
+            <div className="flex flex-col gap-2 mt-3">
+              <div className="flex gap-2">
                 <button
-                onClick={() => handleSelectForAgent(item)}
-                className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-purple-50 dark:bg-purple-900 text-purple-600 dark:text-purple-300 rounded hover:bg-purple-100 dark:hover:bg-purple-800"
-                title="Research with Agent"
-              >
-                <BrainCircuit className="h-3 w-3" />
-                Agent
+                  onClick={() => handleSelectForChat(item)}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-800"
+                  title="Ask questions in Chat"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  Chat
                 </button>
+                  {item.type === 'image' && (!item.analysis?.description || item.analysis.description.trim().length === 0) && (
+                    <button
+                      onClick={() => handleAnalyze(item)}
+                      disabled={loadingImage === item._id}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-100 dark:hover:bg-amber-800"
+                      title="Analyze image to generate tags & description"
+                    >
+                      {loadingImage === item._id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                      Analyze
+                    </button>
+                  )}
+                  <button
+                  onClick={() => handleSelectForAgent(item)}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-purple-50 dark:bg-purple-900 text-purple-600 dark:text-purple-300 rounded hover:bg-purple-100 dark:hover:bg-purple-800"
+                  title="Research with Agent"
+                >
+                  <BrainCircuit className="h-3 w-3" />
+                  Agent
+                  </button>
+                </div>
+                {!hasValidEmbedding(item) && (
+                  <ProcessButton itemId={item._id} />
+                )}
               </div>
           </div>
         ))}

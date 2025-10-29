@@ -31,7 +31,7 @@ export default function ProcessButton({ itemId }: { itemId: string }) {
     <button
       onClick={handleProcess}
       disabled={isProcessing}
-      className="mt-4 w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 flex items-center justify-center"
+      className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 flex items-center justify-center text-sm"
     >
       {isProcessing ? (
         <>

@@ -57,7 +57,7 @@ export default function BatchProcessButton({
     <button
       onClick={handleBatchProcess}
       disabled={isProcessing}
-      className={asIcon ? 'p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300' : 'w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 mb-6'}
+      className={asIcon ? 'p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300' : 'px-3 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-400'}
       title={asIcon ? `Generate embeddings for ${filteredItems.length} items` : undefined}
     >
       {asIcon ? (

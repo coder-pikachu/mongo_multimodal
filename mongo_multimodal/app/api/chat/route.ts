@@ -44,7 +44,7 @@ Please use this context along with your knowledge to provide a comprehensive ans
   }
 
   const result = await streamText({
-    model: anthropic('claude-3-5-sonnet-20240620'),
+    model: anthropic('claude-haiku-4-5-20251001'),
     system: `You are Claude, an expert AI assistant specializing in multimodal data analysis and conversational support.
 
 ## Project Context

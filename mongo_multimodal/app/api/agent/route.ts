@@ -109,7 +109,7 @@ async function analyzeImage(projectId: string, dataId: string, userQuery: string
 
     // Create a message with the image for Claude to analyze
     const analysisResult = await streamText({
-      model: selectedProvider === 'claude' ? anthropic('claude-3-5-sonnet-20240620') : openai('gpt-4o'),
+      model: selectedProvider === 'claude' ? anthropic('claude-haiku-4-5-20251001') : openai('gpt-5-nano-2025-08-07'),
       maxOutputTokens: 4096,
       messages: [
         {
@@ -265,6 +265,8 @@ export async function POST(req: Request) {
     });
 
     console.log('Agent: Starting streamText with tools');
+    console.log('Agent: User query:', userQuery);
+    console.log('Agent: Analysis depth:', analysisDepth);
 
     // Get project information for context
     const db = await getDb();
@@ -279,7 +281,7 @@ export async function POST(req: Request) {
     const selectedProvider = (process.env.LLM_FOR_ANALYSIS as 'claude' | 'openai') || 'claude';
 
     const result = await streamText({
-      model: selectedProvider === 'claude' ? anthropic('claude-3-5-sonnet-20240620') : openai('gpt-4o'),
+      model: selectedProvider === 'claude' ? anthropic('claude-haiku-4-5-20251001') : openai('gpt-5-nano-2025-08-07'),
       maxOutputTokens: 8192,
       system: `You are Claude, an expert AI research assistant specializing in multimodal data analysis and research.
 
@@ -343,10 +345,18 @@ When a tool fails:
 3. **Be direct** about what you found vs. what you couldn't find
 4. **Don't give generic advice** - either solve it or clearly state limitations
 
-Remember: You're here to **solve the user's specific query**, not provide educational content about what might be possible.`,
+## CRITICAL: Final Response Requirement
+After using tools (search, analyze, etc.), you MUST provide a comprehensive synthesized answer that:
+1. **Directly answers** the user's question using the information gathered
+2. **Integrates findings** from all tool calls into a coherent response
+3. **Uses proper markdown formatting** with headers, bullets, and emphasis
+4. **Cites specific sources** (filenames, data points) from your tool results
+
+Never end your response immediately after tool calls. Always synthesize and present your findings to the user.`,
       messages: messages.slice(-10),
       maxRetries: 2,
-      stopWhen: stepCountIs(analysisDepth === 'deep' ? 8 : 5),
+      // Allow one additional step after tool calls for final synthesis
+      stopWhen: stepCountIs(analysisDepth === 'deep' ? 4 : 2),
       tools: {
         searchProjectData: tool({
           description: 'Search for information within the current project documents and images',
@@ -404,6 +414,8 @@ Remember: You're here to **solve the user's specific query**, not provide educat
         // }),
       },
       onFinish: async ({ text }) => {
+        console.log('Agent: onFinish called with text length:', text?.length || 0);
+        console.log('Agent: Final text preview:', text?.substring(0, 200));
         // Save the assistant's response
         await saveConversation(projectId, sessionId, {
           role: 'assistant',
@@ -412,8 +424,53 @@ Remember: You're here to **solve the user's specific query**, not provide educat
       },
     });
 
-    // Return the streaming response
-    return result.toUIMessageStreamResponse();
+    // Manually create data stream with tool support
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of result.fullStream) {
+            // Format based on chunk type
+            let output = '';
+
+            if (chunk.type === 'text-delta' && chunk.text) {
+              // Text chunks: type 0
+              output = `0:${JSON.stringify(chunk.text)}\n`;
+            } else if (chunk.type === 'tool-call') {
+              // Tool calls: type 9
+              output = `9:${JSON.stringify({
+                toolCallId: chunk.toolCallId,
+                toolName: chunk.toolName,
+                args: chunk.input
+              })}\n`;
+            } else if (chunk.type === 'tool-result') {
+              // Tool results: type a
+              const result = 'output' in chunk ? chunk.output : '';
+              output = `a:${JSON.stringify({
+                toolCallId: chunk.toolCallId,
+                toolName: chunk.toolName,
+                result: result
+              })}\n`;
+            }
+
+            if (output) {
+              controller.enqueue(encoder.encode(output));
+            }
+          }
+          controller.close();
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Vercel-AI-Data-Stream': 'v1'
+      }
+    });
   } catch (error) {
     console.error('Agent API Error:', error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }), {

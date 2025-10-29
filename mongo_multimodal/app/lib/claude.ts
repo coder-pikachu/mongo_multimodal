@@ -208,7 +208,7 @@ export async function generateOpenAIResponse(
   ];
 
   const requestBody = {
-    model: images.length > 0 ? 'gpt-4o-mini' : 'gpt-4o-mini',
+    model: images.length > 0 ? 'gpt-5-nano-2025-08-07' : 'gpt-5-nano-2025-08-07',
     max_tokens: 2048,
     messages,
     temperature: 0

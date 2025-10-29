@@ -52,7 +52,7 @@ export async function doPaginatedVectorSearch(
       'query'
     );
 
-    const similarityThreshold = 0.4;
+    const similarityThreshold = 0.3;
     const vectorFetchLimit = Math.max(200, page * limit + 50);
 
     // Basic tokenization of query for lightweight textual boosting

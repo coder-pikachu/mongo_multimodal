@@ -88,13 +88,12 @@ export default function AgentView({ projectId }: AgentViewProps) {
 
             setMessages(prev => [...prev, assistantMessage]);
 
-                        if (reader) {
+            if (reader) {
                 let buffer = '';
-                let isInToolCall = false;
-                let currentToolName = '';
-                let _currentToolCallId = '';
-                let currentToolInput: Record<string, unknown> | undefined = undefined;
                 const messageToolCalls: ToolCallMetadata[] = [];
+                let currentToolName = '';
+                let currentToolCallId = '';
+                let currentToolInput: Record<string, unknown> | undefined = undefined;
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -105,93 +104,118 @@ export default function AgentView({ projectId }: AgentViewProps) {
                     buffer = lines.pop() || '';
 
                     for (const line of lines) {
-                        if (line.trim() === '') continue;
+                        if (!line.trim() || line.trim() === '0:""') continue;
+
+                        console.log('[Agent Stream] Received line:', line.substring(0, 100));
 
                         try {
-                            // Parse SSE format
-                            if (line.startsWith('data: ')) {
-                                const data = line.slice(6);
-                                if (data === '[DONE]') continue;
+                            // Parse data stream format: "type:payload"
+                            const colonIndex = line.indexOf(':');
+                            if (colonIndex === -1) continue;
 
-                                                                                                const parsed = JSON.parse(data);
+                            const type = line.substring(0, colonIndex);
+                            const payload = line.substring(colonIndex + 1);
+                            console.log('[Agent Stream] Type:', type, 'Payload preview:', payload.substring(0, 50));
 
-                                // Handle different chunk types based on the data stream protocol
-                                switch (parsed.type) {
-                                    case 'text-delta':
-                                        if (parsed.delta) {
-                                            assistantMessage.content += parsed.delta;
+                            switch (type) {
+                                case '0': // Text chunk
+                                    try {
+                                        const text = JSON.parse(payload);
+                                        if (text) {
+                                            assistantMessage.content += text;
                                             setMessages(prev => prev.map(m =>
                                                 m.id === assistantMessage.id
                                                     ? { ...m, content: assistantMessage.content }
                                                     : m
                                             ));
                                         }
-                                        break;
+                                    } catch (e) {
+                                        // If not JSON, treat as plain text
+                                        if (payload) {
+                                            assistantMessage.content += payload;
+                                            setMessages(prev => prev.map(m =>
+                                                m.id === assistantMessage.id
+                                                    ? { ...m, content: assistantMessage.content }
+                                                    : m
+                                            ));
+                                        }
+                                    }
+                                    break;
 
-                                                                        case 'tool-input-start':
-                                        isInToolCall = true;
-                                        currentToolName = parsed.toolName;
-                                        _currentToolCallId = parsed.toolCallId || `tool-${Date.now()}`;
-                                        // Add tool call indicator to the message
-                                        const toolIndicator = currentToolName === 'searchProjectData'
+                                case '9': // Tool call
+                                    try {
+                                        const toolCall = JSON.parse(payload);
+                                        currentToolName = toolCall.toolName;
+                                        currentToolCallId = toolCall.toolCallId;
+                                        currentToolInput = toolCall.args;
+
+                                        // Add visual indicator
+                                        const indicator = currentToolName === 'searchProjectData'
                                             ? '\n\n🔍 Searching project data...\n'
                                             : currentToolName === 'analyzeImage'
                                             ? '\n\n🖼️ Analyzing image...\n'
-                                            : '\n\n🌐 Searching the web...\n';
-                                        assistantMessage.content += toolIndicator;
+                                            : currentToolName === 'projectDataAnalysis'
+                                            ? '\n\n📄 Fetching analysis...\n'
+                                            : '\n\n🔧 Using tool...\n';
+
+                                        assistantMessage.content += indicator;
                                         setMessages(prev => prev.map(m =>
                                             m.id === assistantMessage.id
                                                 ? { ...m, content: assistantMessage.content }
                                                 : m
                                         ));
-                                        break;
+                                    } catch (e) {
+                                        console.error('Failed to parse tool call:', e);
+                                    }
+                                    break;
 
-                                    case 'tool-input-available':
-                                        if (parsed.input) {
-                                            currentToolInput = parsed.input;
-                                        }
-                                        break;
+                                case 'a': // Tool result
+                                    try {
+                                        const result = JSON.parse(payload);
 
-                                    case 'tool-output-available':
-                                        if (isInToolCall) {
-                                            isInToolCall = false;
-
-                                            // Store tool call metadata
-                                            const toolCallData: ToolCallMetadata = {
+                                        // Store tool call metadata
+                                        if (currentToolName) {
+                                            messageToolCalls.push({
                                                 toolName: currentToolName,
                                                 input: currentToolInput,
-                                                output: parsed.output,
+                                                output: result.result,
                                                 timestamp: new Date()
-                                            };
-                                            messageToolCalls.push(toolCallData);
-
-                                            // Add completion indicator
-                                            assistantMessage.content += '✓ Completed.\n\n';
-                                            setMessages(prev => prev.map(m =>
-                                                m.id === assistantMessage.id
-                                                    ? { ...m, content: assistantMessage.content }
-                                                    : m
-                                            ));
-                                        }
-                                        break;
-
-                                    case 'finish':
-                                        // Store tool calls metadata for this message
-                                        if (messageToolCalls.length > 0) {
-                                            setToolCallsMetadata(prev => {
-                                                const newMap = new Map(prev);
-                                                newMap.set(assistantMessage.id, messageToolCalls);
-                                                return newMap;
                                             });
                                         }
-                                        break;
-                                }
+
+                                        // Add completion indicator
+                                        assistantMessage.content += '✓ Completed.\n\n';
+                                        setMessages(prev => prev.map(m =>
+                                            m.id === assistantMessage.id
+                                                ? { ...m, content: assistantMessage.content }
+                                                : m
+                                        ));
+
+                                        // Reset current tool
+                                        currentToolName = '';
+                                        currentToolInput = undefined;
+                                    } catch (e) {
+                                        console.error('Failed to parse tool result:', e);
+                                    }
+                                    break;
+
+                                case 'e': // Error
+                                    console.error('Stream error:', payload);
+                                    break;
                             }
                         } catch (e) {
-                            // Ignore parsing errors
-                            console.error('Parse error:', e);
+                            console.error('Parse error:', e, 'Line:', line);
                         }
                     }
+                }
+
+                // Store tool calls metadata
+                if (messageToolCalls.length > 0) {
+                    setToolCallsMetadata(prev => {
+                        const newMap = new Map(prev);
+                        newMap.set(assistantMessage.id, messageToolCalls);
+                        return newMap;
+                    });
                 }
             }
         } catch (error) {

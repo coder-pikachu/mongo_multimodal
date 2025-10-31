@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { doVectorImageSearch } from '../../lib/utils';
 import { getDb } from '@/lib/mongodb';
-
-
+import { performVectorSearch } from '@/lib/services/vectorSearch.service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,7 +30,15 @@ export async function POST(req: NextRequest) {
       searchType = 'image';
     }
 
-    const { results } = await doVectorImageSearch(searchType, searchQuery, db);
+    // Global vector search (no project filter)
+    const searchConfig = {
+      limit: 12,
+      numCandidates: 250,
+      similarityThreshold: 0.6,
+      exact: false
+    };
+
+    const results = await performVectorSearch(db, searchQuery, searchType, searchConfig);
     return NextResponse.json({ results });
   } catch (error) {
     console.error('Vector search error:', error);

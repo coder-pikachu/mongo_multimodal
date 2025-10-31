@@ -2,218 +2,406 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Overview
+## Project Overview
 
-This is a MongoDB Multimodal Vector Search application built with Next.js 15, TypeScript, MongoDB Atlas, LangGraph, and the Vercel AI SDK. It processes multimodal data (images and documents) using AI services to generate vector embeddings for semantic search capabilities. The application features three distinct interaction modes: Search, Chat, and Agent.
+A Next.js 15 application that enables semantic search across visual and textual data using MongoDB Atlas Vector Search, VoyageAI embeddings, and Anthropic Claude AI. Users can upload images and PDFs, which are analyzed by AI and converted into 1024-dimensional vector embeddings for multimodal search.
 
-## Essential Commands
+## Development Commands
 
 ```bash
 # Development
-npm run dev          # Start development server with Turbopack on localhost:3000
-
-# Production
-npm run build        # Build for production
-npm run start        # Start production server
+npm run dev              # Start Next.js development server with Turbopack
+npm run build           # Production build
+npm run start           # Start production server
+npm run lint            # Run ESLint
 
 # Database Operations
-npm run test:db      # Test MongoDB connection
-npm run create:index # Create vector search indexes in MongoDB
-
-# Code Quality
-npm run lint         # Run ESLint with Next.js rules
+npm run test:db         # Test MongoDB connection (runs app/scripts/test-db.ts)
+npm run create:index    # Create vector search indexes in MongoDB Atlas (runs app/scripts/create-vector-index.ts)
 ```
 
-## Architecture Overview
+## Architecture
 
-### Core Technologies
+### Service Layer Pattern
 
-- **Frontend**: Next.js 15.1.7 with App Router, React 19, TypeScript
-- **Database**: MongoDB 6.3.0 with Atlas Vector Search
-- **AI Framework**: LangGraph for agent workflows and reasoning
-- **Chat Interface**: Vercel AI SDK for streaming conversations
-- **AI Services**:
-  - Anthropic Claude SDK for image analysis and conversational AI
-  - VoyageAI for generating vector embeddings
-  - Tavily AI for web search capabilities in agent mode
-  - OpenAI API support (configurable via LLM_FOR_ANALYSIS)
-- **Observability**: LangSmith for agent tracing and debugging
-- **Styling**: TailwindCSS with PostCSS
-- **State Management**: TanStack Query (React Query)
-- **Form Handling**: React Hook Form with Zod validation
+The codebase follows a clean service layer architecture to eliminate code duplication:
 
-### Project Structure
+**Service Layer** (`app/lib/services/`)
+- `projectData.service.ts` - All projectData operations (analyze, process, bulk operations)
+- `vectorSearch.service.ts` - Unified vector search with configurable strategies
 
+**Route Handlers** (`app/api/`)
+- Thin controllers that delegate to service layer
+- Consistent error handling
+- No business logic duplication
+
+**Utilities** (`app/lib/`)
+- `utils.ts` - Re-exports service functions for backward compatibility
+- `claude.ts` - LLM response generation
+- `voyageai.ts` - Embedding generation
+- `mongodb.ts` - Database connection
+
+### Three Interaction Modes
+
+The application provides three distinct ways to interact with data, each using different AI approaches:
+
+1. **Search Mode** (`/api/projects/[projectId]/search`)
+   - Direct vector search with pagination
+   - Returns top-k results with similarity scores
+   - Uses Claude/OpenAI to synthesize results via `lib/claude.ts::generateLLMResponse()`
+
+2. **Chat Mode** (`/api/chat/route.ts`)
+   - Conversational Q&A using Vercel AI SDK
+   - RAG-enhanced: Performs vector search, then streams response with context
+   - Uses `claude-haiku-4-5-20251001` model via `@ai-sdk/anthropic`
+
+3. **Agent Mode** (`/api/agent/route.ts`)
+   - LangGraph-inspired agentic workflow with tools
+   - Uses Vercel AI SDK's `streamText` with tools: `searchProjectData`, `analyzeImage`, `projectDataAnalysis`
+   - Supports multi-step reasoning with `stopWhen: stepCountIs(depth)` parameter
+   - Can analyze up to 5 images per query in deep mode
+   - Saves conversation history to MongoDB `conversations` collection
+
+### Data Processing Pipeline
+
+1. **Upload** (`/api/projects/[projectId]/upload/route.ts`)
+   - Accepts images (JPEG/PNG) and PDFs (max 20MB)
+   - Stores raw base64 in MongoDB `projectData` collection
+   - Sets `embedding: null` initially
+
+2. **Analysis** (`/api/projects/data/[id]/analyze/route.ts`)
+   - Uses Claude or OpenAI (configurable via `LLM_FOR_ANALYSIS` env var) to analyze visual content
+   - Extracts description, tags, insights, and facets
+   - Stores in `projectData.analysis` field
+   - Does NOT generate embeddings (analysis and embedding are separate steps)
+
+3. **Embedding Generation** (`/api/projects/data/[id]/process/route.ts`)
+   - Calls `lib/voyageai.ts::generateMultimodalEmbedding()`
+   - Sends text and/or base64 image to VoyageAI `voyage-multimodal-3` model
+   - Stores 1024-dimensional vector in `projectData.embedding`
+   - Sets `processedAt` timestamp
+
+4. **Vector Search**
+   - Uses MongoDB Atlas vector search index named `vector_index` on `multimodal.projectData` collection
+   - Index configuration: `{ "embedding": { "type": "knnVector", "dimensions": 1024, "similarity": "cosine" } }`
+   - Search implementation in `lib/utils.ts::doPaginatedVectorSearch()`
+
+### Key Libraries and Integrations
+
+- **MongoDB**: Connection managed in `lib/mongodb.ts`, uses HMR-safe global caching in development
+- **Database Name**: Hardcoded to `"test"` in `lib/mongodb.ts::getDb()` (line 33)
+- **VoyageAI**: Multimodal embeddings via `lib/voyageai.ts`, model: `voyage-multimodal-3`
+- **Anthropic**: Image analysis and chat via `@ai-sdk/anthropic` and `@anthropic-ai/sdk`
+- **OpenAI**: Optional provider for analysis/chat via `@ai-sdk/openai`
+- **PDF Processing**: `pdfjs-dist` converts PDFs to images via `lib/pdf-to-image.ts`
+- **Image Compression**: `lib/image-utils.ts::compressImage()` optimizes images before analysis to reduce token usage
+
+### Collections Schema
+
+**projects**
+```typescript
+{
+  _id: ObjectId,
+  name: string,
+  description: string,
+  createdAt: Date,
+  updatedAt: Date
+}
 ```
-/app/                    # Next.js App Router
-├── api/                 # API routes for backend operations
-│   ├── agent/          # LangGraph agent endpoint for complex reasoning
-│   ├── chat/           # Vercel AI SDK chat endpoint for conversations
-│   ├── projects/       # CRUD operations and project-specific search
-│   └── search/         # Global search endpoints
-├── lib/                # Core utilities and integrations
-│   ├── mongodb.ts      # MongoDB connection and client
-│   ├── claude.ts       # Claude AI integration for image analysis
-│   ├── voyageai.ts     # VoyageAI embedding generation
-│   └── utils.ts        # Shared helper functions including doPaginatedVectorSearch
-├── components/         # Reusable React components
-├── projects/           # Project-related pages
-│   └── [projectId]/
-│       └── components/
-│           ├── SearchView.tsx    # Direct vector search with pagination
-│           ├── ChatView.tsx      # Conversational interface
-│           ├── AgentView.tsx     # AI agent interface
-│           └── ProjectPageClient.tsx # Main tabbed interface
-├── types/             # TypeScript type definitions
-└── scripts/           # Database utility scripts
+
+**projectData**
+```typescript
+{
+  _id: ObjectId,
+  projectId: ObjectId,
+  type: 'image' | 'document',
+  content: {
+    text?: string,      // For documents
+    base64?: string     // For images (stored in full resolution)
+  },
+  metadata: {
+    filename: string,
+    mimeType: string,
+    size: number
+  },
+  analysis?: {          // Generated by Claude/OpenAI
+    description: string,
+    tags: string[],
+    insights: string[],
+    facets: Record<string, any>
+  },
+  embedding?: number[], // 1024-dimensional vector from VoyageAI
+  processedAt?: Date,   // When embedding was generated
+  createdAt: Date,
+  updatedAt: Date
+}
 ```
 
-### Key Patterns and Conventions
-
-1. **Three-Mode Interface**: Each project page features tabs for Search, Chat, and Agent modes
-2. **API Routes**: All backend endpoints use Next.js API routes in `/app/api/`
-3. **Database Access**: MongoDB connections are managed through `/app/lib/mongodb.ts` with connection pooling
-4. **Vector Processing Pipeline**:
-   - Files are uploaded and processed in `/app/api/projects/[id]/upload/`
-   - Text/images are analyzed using Claude AI
-   - Vector embeddings are generated via VoyageAI
-   - Vectors are stored in MongoDB with proper indexing
-5. **Agent Workflow**: LangGraph manages complex reasoning with tools and state management
-6. **Streaming Responses**: Both chat and agent modes use streaming for real-time responses
-7. **Error Handling**: Consistent error responses with proper HTTP status codes
-8. **Type Safety**: Strict TypeScript with comprehensive type definitions in `/app/types/`
-
-### Environment Variables Required
-
-```
-MONGODB_URI              # MongoDB Atlas connection string
-VOYAGE_API_KEY           # VoyageAI API key for embeddings
-ANTHROPIC_API_KEY        # Claude API key for image analysis and chat
-BRAVE_SEARCH_API_KEY     # BraveSearch API key for web search in agent mode (FREE)
-LANGCHAIN_TRACING_V2=true # Enable LangSmith tracing (optional)
-LANGCHAIN_API_KEY        # LangSmith API key for agent debugging (optional)
-LANGCHAIN_PROJECT        # Optional: Project name in LangSmith
-OPENAI_API_KEY          # OpenAI API key (optional, for alternative LLM)
-LLM_FOR_ANALYSIS        # Which LLM to use: "claude" or "openai"
-VERCEL_URL              # Base URL (defaults to http://localhost:3000)
+**conversations**
+```typescript
+{
+  _id: ObjectId,
+  projectId: string,
+  sessionId: string,
+  message: {
+    role: 'user' | 'assistant',
+    content: string    // Base64 image data is stripped before saving
+  },
+  timestamp: Date,
+  contentCleaned?: boolean
+}
 ```
 
-### Database Schema Considerations
+## Environment Configuration
 
-- Projects are stored in the `projects` collection
-- Each project contains embedded documents with vector fields
-- Vector indexes must be created using `npm run create:index` before vector search will work
-- Embedding dimensions: 1024 (VoyageAI default)
+Required environment variables in `.env.local`:
 
-### Development Workflow
+```bash
+# MongoDB Atlas (M10+ required for vector search)
+MONGODB_URI=mongodb+srv://...
 
-1. Ensure MongoDB connection is working: `npm run test:db`
-2. Create vector indexes if not exists: `npm run create:index`
-3. Start development server: `npm run dev`
-4. Before committing, ensure linting passes: `npm run lint`
+# AI Services
+VOYAGE_API_KEY=...              # VoyageAI for embeddings
+ANTHROPIC_API_KEY=...           # Claude for analysis and chat
+OPENAI_API_KEY=...              # Optional, for OpenAI models
 
-### API Integration Points
+# LLM Selection
+LLM_FOR_ANALYSIS=claude         # "claude" or "openai" - controls which provider analyzes images
 
-**Three-Mode System:**
-- **Search Mode**: POST `/api/projects/[projectId]/search` with `mode: "search"` - Paginated vector search
-- **Chat Mode**: POST `/api/chat` - Vercel AI SDK streaming chat
-- **Agent Mode**: POST `/api/agent` - LangGraph agent with tools and reasoning
+# Optional: LangSmith tracing for agent mode
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=...
+LANGCHAIN_PROJECT=...
+```
 
-**Core Operations:**
-- **File Upload**: POST `/api/projects/[id]/upload` - Handles multipart form data
-- **Project Data**: GET/POST `/api/projects/data/[id]/content` - Manage project content
+## Service Layer Details
 
-### Important Implementation Details
+### ProjectData Service (`lib/services/projectData.service.ts`)
 
-1. **Three Interaction Modes**:
-   - **Search Mode**: Direct vector search with pagination, displays raw results with timing
-   - **Chat Mode**: Conversational Q&A using Vercel AI SDK for streaming
-   - **Agent Mode**: Complex reasoning with LangGraph, uses vector search and web search tools
+Provides centralized functions for all projectData operations:
 
-2. **File Processing**:
-   - Images: JPEG/JPG files analyzed via Claude AI
-   - PDFs: Converted to images (one per page) with 2MB size limit per page
-   - PDF files must be under 20MB
+**Core Functions:**
+- `analyzeImageItem(db, itemId)` - Analyze single image with AI (respects `LLM_FOR_ANALYSIS` env var)
+- `processItemEmbedding(db, itemId)` - Generate embedding for single item
+- `bulkAnalyzeImages(db, projectId, itemIds)` - Validate and queue multiple items for analysis
+- `bulkProcessEmbeddings(db, projectId, itemIds)` - Process multiple items in sequence
+- `getItemContent(db, itemId)` - Lazy load item content (base64 or text)
 
-3. **PDF Processing Pipeline**:
-   - Client-side conversion using pdf.js
-   - Each page rendered to canvas with adjustable quality
-   - Automatic scaling to meet 2MB size requirement
-   - Progress tracking for multi-page documents
+**Benefits:**
+- Single source of truth for business logic
+- Consistent model selection across all routes
+- Easier testing and maintenance
+- DRY principle - no duplicate code
 
-4. **Vector Generation**: All content is converted to text descriptions before embedding
+**Model Selection:**
+All analysis functions automatically use the provider specified in `LLM_FOR_ANALYSIS` environment variable:
+- `claude` → `claude-haiku-4-5-20251001`
+- `openai` → `gpt-5-nano-2025-08-07`
 
-5. **Agent Capabilities**:
-   - Uses LangGraph for state management and tool orchestration
-   - Has access to project-specific vector search tool
-   - Can perform web searches using Tavily AI
-   - Traces all operations to LangSmith for debugging
+### Vector Search Service (`lib/services/vectorSearch.service.ts`)
 
-6. **Response Streaming**: Both chat and agent modes use streaming for better UX
+Unified vector search implementation with three configurable strategies:
 
-7. **Dark Mode**: Implemented using next-themes with system preference support
+**Core Functions:**
+- `performVectorSearch(db, query, queryType, config, projectId?)` - Base search function
+- `paginatedVectorSearch(db, projectId, query, type, page, limit)` - Search mode with pagination
+- `vectorSearchWithAnalysis(db, query, queryType, projectId?, provider?)` - Search + LLM synthesis
 
-## Project Query Workflow
+**Search Strategies:**
+```typescript
+// Paginated (Search Mode)
+{ limit: 200, numCandidates: 800, similarityThreshold: 0.3 }
 
-The application now implements three distinct modes of interaction:
+// Analysis (Chat/Legacy Mode)
+// Project-specific: { limit: 2, numCandidates: 150, threshold: 0.2 }
+// Global: { limit: 10, numCandidates: 300, threshold: 0.2 }
 
-### 1. Search Mode
+// Agent Mode
+{ limit: 2, numCandidates: 150, similarityThreshold: 0.6 }
+```
 
-**Direct Vector Search with Pagination**
-- **API**: POST `/api/projects/[projectId]/search` with `mode: "search"`
-- **Function**: `doPaginatedVectorSearch()` in `/app/lib/utils.ts`
-- **Features**: Fast, paginated results with timing information
-- **UI**: `SearchView.tsx` with search bar and pagination controls
+**Benefits:**
+- Single implementation for all vector search needs
+- Configurable parameters based on use case
+- Consistent text boosting for relevance
+- Centralized project context handling
 
-### 2. Chat Mode
+### Route Consolidation
 
-**Conversational Interface**
-- **API**: POST `/api/chat`
-- **Technology**: Vercel AI SDK with streaming
-- **Features**: Maintains conversation context, streaming responses
-- **UI**: `ChatView.tsx` with message history and input form
+**Before Refactoring:**
+- `/api/projects/data/[id]/analyze` - 67 lines, duplicate logic
+- `/api/projects/data/[id]/process` - 62 lines, duplicate logic
+- `/api/projects/[projectId]/data/analyze` - 32 lines, duplicate logic
+- `/api/projects/[projectId]/data/process` - 63 lines, duplicate logic
 
-### 3. Agent Mode
+**After Refactoring:**
+- Each route: ~20 lines, thin controller
+- All business logic in services
+- Consistent error handling
+- **~80% code reduction in routes**
 
-**AI Agent with Tools and Reasoning**
-- **API**: POST `/api/agent`
-- **Technology**: LangGraph with state management
-- **Tools**: Vector search (project-specific) and web search (Tavily)
-- **Features**: Complex reasoning, planning, tool use
-- **UI**: `AgentView.tsx` with status indicators
-- **Debugging**: Full traces available in LangSmith
+## Important Implementation Details
 
-### Core Functions and Files
+### Vector Search Configuration
 
-- **Search Function**: `doPaginatedVectorSearch()` in `/app/lib/utils.ts`
-- **Chat API**: `/app/api/chat/route.ts` using Vercel AI SDK
-- **Agent API**: `/app/api/agent/route.ts` using LangGraph
-- **Project Search API**: `/app/api/projects/[projectId]/search/route.ts` (handles both search and agent modes)
-- **Vector Search**: MongoDB aggregation pipeline with `$vectorSearch` stage
-- **LLM Integration**: `generateClaudeResponse()` in `/app/lib/claude.ts`
-- **Embedding Service**: `generateMultimodalEmbedding()` in `/app/lib/voyageai.ts`
+- **Index Name**: Must be `vector_index` (referenced in search queries)
+- **Database**: Hardcoded to `"test"` in `lib/mongodb.ts`
+- **Collection**: `projectData`
+- **Similarity Threshold**: 0.5 for search mode, 0.6 for agent mode (in `lib/utils.ts`)
+- Vector search returns score from 0-1 where higher = more similar
 
-### Agent Architecture
+### Agent Mode Tool Usage
 
-The LangGraph agent follows this workflow:
-1. **Input Processing**: Receives user query and project context
-2. **Planning**: Determines which tools to use
-3. **Tool Execution**: Can call vector search and web search tools
-4. **Reasoning**: Synthesizes information from multiple sources
-5. **Response Generation**: Provides comprehensive answer
-6. **Tracing**: All steps logged to LangSmith for debugging
+The agent uses three tools defined in `/api/agent/route.ts`:
 
-### Data Flow Considerations
+1. **searchProjectData**: Returns top 2 results per call, includes scores and descriptions
+2. **analyzeImage**: Fetches image by dataId, compresses it, sends to Claude/OpenAI for context-aware analysis
+3. **projectDataAnalysis**: Fetches stored analysis without base64 (faster, uses cached analysis)
 
-- **Multimodal Support**: Seamlessly handles text and image queries across all modes
-- **Performance**: Search mode optimized for speed, agent mode for comprehensiveness
-- **Project Filtering**: All searches properly filtered by project ID
-- **Error Handling**: Comprehensive error catching with appropriate status codes
-- **Streaming**: Real-time response delivery in chat and agent modes
+Agent system prompt emphasizes:
+- **CRITICAL CONSTRAINT**: Only use information from project data via tools (prevents hallucination)
+- Never use external knowledge, assumptions, or training data
+- Explicitly state when data is not found in the project
+- **Step Budget Management**: Agent knows its step limits and plans accordingly
+- **Planning Phase**: Agent must plan tool usage BEFORE execution
+- Multiple focused tool calls over broad searches
+- Iterative refinement (1-2 single-word probes first)
+- Mandatory final synthesis step after tool usage
+- Project context awareness
 
-### IMPORTANT
+The prompt includes explicit hallucination prevention with ❌/✅ rules to enforce data-grounded responses.
 
-- When ready to test using browser, don't run the dev server. Ask the user to run the command and then test with clear instructions.
-- The three-mode interface (Search/Chat/Agent) is the primary user interaction pattern
-- LangSmith tracing requires proper environment variables for agent debugging
-- All vector searches are project-scoped for data isolation
+### Step Budget System
+
+**How It Works:**
+- Each tool call consumes 1 step
+- Final text response also consumes 1 step
+- Agent MUST reserve the final step for synthesis
+
+**Step Allocation:**
+```
+General Mode (analysisDepth: 'general'):
+- Total: 5 steps
+- Tools: Up to 4 steps
+- Synthesis: 1 step (mandatory)
+- Strategy: 1-2 searches + 1-2 analyses + synthesis
+
+Deep Mode (analysisDepth: 'deep'):
+- Total: 8 steps
+- Tools: Up to 7 steps
+- Synthesis: 1 step (mandatory)
+- Strategy: 2-3 searches + 3-4 analyses + synthesis
+```
+
+**Planning Phase:**
+The agent is instructed to plan BEFORE making any tool calls:
+1. Analyze what information is needed
+2. Plan which tools to use and in what order
+3. Verify sufficient steps remain
+4. Prioritize essential information over exhaustive exploration
+
+**Failure Prevention:**
+- System prompt explicitly warns: "If you use all steps on tools, you CANNOT provide an answer"
+- Agent monitors step usage after each tool call
+- Better to synthesize partial results than run out of steps without answering
+- If search returns no results, agent tries 1-2 alternatives then concludes (not exhaustive retries)
+
+### Image Compression Strategy
+
+Before sending images to LLMs for analysis (`lib/image-utils.ts`):
+- Target: 768px max dimension
+- Quality: 85% (JPEG)
+- Estimates token usage: ~765 tokens per 1024px image
+- Compression reduces API costs and latency
+
+### PDF Handling
+
+PDFs are converted to images page-by-page:
+- Each page becomes a separate `projectData` document with `type: 'image'`
+- Uses `pdfjs-dist` with canvas rendering
+- Original PDF is not stored; only the page images
+
+### Provider Selection
+
+Both Claude and OpenAI are supported. Selection is controlled by `LLM_FOR_ANALYSIS` environment variable:
+- **Chat Mode**: Always uses Claude Haiku 4.5 (`claude-haiku-4-5-20251001`)
+- **Agent Mode**: Respects `LLM_FOR_ANALYSIS` for tool execution
+- **Analysis**: Respects `LLM_FOR_ANALYSIS` for visual content analysis
+- OpenAI uses `gpt-5-nano-2025-08-07` when selected
+
+## Testing and Debugging
+
+### Database Connection Test
+```bash
+npm run test:db
+```
+Verifies MongoDB URI and lists collections.
+
+### Vector Index Creation
+```bash
+npm run create:index
+```
+Creates the required `vector_index` in MongoDB Atlas. Index must be created manually in Atlas UI if script fails (requires M10+ cluster).
+
+### Common Issues
+
+1. **"Vector index not found"**: Run `npm run create:index` or create manually in Atlas
+2. **Database name mismatch**: Ensure MongoDB URI database matches `"test"` or update `lib/mongodb.ts::getDb()`
+3. **Embedding fails**: Check VoyageAI API key and quota
+4. **Analysis fails**: Check Anthropic/OpenAI API keys based on `LLM_FOR_ANALYSIS` setting
+
+## Frontend Structure
+
+- **Project Pages**: `/app/projects/[projectId]/page.tsx` renders tabbed interface
+- **Tab Components**: `SearchView.tsx`, `ChatView.tsx`, `AgentView.tsx`, `DataExplorerView.tsx`
+- **Data Explorer**: Shows uploaded files with process/analyze buttons
+- **Batch Processing**: `BatchProcessButton.tsx` processes multiple files sequentially
+- **React Query**: Used for data fetching and cache management via `@tanstack/react-query`
+
+## Code Quality
+
+- **ESLint**: Next.js recommended config
+- **TypeScript**: Strict mode enabled
+- **Type Definitions**: `app/types/models.ts` and `app/types/clientTypes.ts`
+- **Validation**: Zod schemas in `app/lib/validations.ts`
+- **Service Layer**: Clean separation of business logic from route handlers
+- **DRY Principle**: No code duplication across routes
+- **Backward Compatibility**: `utils.ts` re-exports service functions for legacy code
+
+## Recent Optimizations
+
+### Comprehensive Cleanup (Latest)
+**Removed Redundant Files (4 deletions):**
+- ✅ Deleted `/api/search/route.ts` - Unused global search route (duplicated by project-scoped search)
+- ✅ Deleted `/app/myprojects/[projectId]/loading.tsx` - Orphaned loading component with no page
+- ✅ Deleted `/api/ask-question/route.ts` - Legacy demo API (functionality in chat/agent)
+- ✅ Deleted `/app/vector-search/page.tsx` - Standalone demo page (not part of main app)
+
+**Code Cleanup:**
+- ✅ Removed placeholder function `_searchWebHelper` from agent route
+- ✅ Removed commented-out web search tool code
+- ✅ Fixed missing `doVectorImageSearch` function in `/api/vector-search/route.ts`
+- ✅ Fixed unused `projectId` prop in `BatchProcessButton` component
+- ✅ All routes now use centralized vector search service
+- ✅ Step budget system added to prevent incomplete agent responses
+
+**Architecture Verified:**
+- ✅ Dual route pattern (`/projects/data/[id]/` vs `/projects/[projectId]/data/`) is intentional
+  - Single-item routes: Individual operations by global ID
+  - Bulk routes: Batch operations with project scoping
+- ✅ ProcessButton vs BatchProcessButton serve different use cases
+- ✅ All service layer functions are actively used (no dead code)
+
+### Service Layer Refactoring
+- ✅ Created `projectData.service.ts` for all data operations
+- ✅ Created `vectorSearch.service.ts` for unified search logic
+- ✅ Reduced route handler code by ~80%
+- ✅ Consistent model selection across all endpoints
+- ✅ Single source of truth for business logic
+
+## Performance Considerations
+
+- **Vector Search Pagination**: Implemented in `lib/utils.ts::doPaginatedVectorSearch()` to limit result sets
+- **Image Compression**: Reduces token usage by ~60-80% before LLM analysis
+- **Conversation Storage**: Base64 data is stripped before saving to `conversations` collection to avoid MongoDB document size limits (16MB)
+- **HMR Safety**: MongoDB client uses global caching in development to prevent connection pool exhaustion

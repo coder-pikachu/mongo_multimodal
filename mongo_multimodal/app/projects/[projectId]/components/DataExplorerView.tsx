@@ -97,7 +97,6 @@ export default function DataExplorerView({ projectId, data, onSelectForChat, onS
                     {unembeddedCount > 0 && (
                         <div className="inline-block">
                             <BatchProcessButton
-                                projectId={projectId}
                                 unprocessedItems={unembeddedItems}
                                 asIcon={false}
                             />

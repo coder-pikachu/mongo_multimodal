@@ -17,7 +17,6 @@ export default function BatchProcessButton({
   unprocessedItems,
   asIcon = false
 }: {
-  projectId: string;
   unprocessedItems: ClientProjectData[];
   asIcon?: boolean;
 }) {

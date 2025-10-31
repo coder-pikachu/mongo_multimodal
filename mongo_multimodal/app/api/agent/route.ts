@@ -154,10 +154,6 @@ async function analyzeImage(projectId: string, dataId: string, userQuery: string
   }
 }
 
-
-// Placeholder to avoid unused var errors when web search tool is disabled
-async function _searchWebHelper(_query: string) { return 'disabled'; }
-
 // Tool: fetch stored analysis for a specific projectData item
 async function getProjectDataAnalysis(projectId: string, dataId: string) {
   try {
@@ -306,9 +302,40 @@ You have access to three powerful research tools:
 - Can analyze up to ${maxAnalyses} images per query (${analysisDepth} analysis mode)
 - Provides targeted analysis based on what the user is specifically asking about
 
-### 4. 📄 projectDataAnalysis
+### 3. 📄 projectDataAnalysis
 - Fetch the stored analysis for a specific project item by id
 - Returns description, tags, insights, facets, and metadata (no base64) for precise reasoning
+
+## CRITICAL: Data Source Constraints
+**YOU MUST ONLY USE INFORMATION FROM THE PROJECT DATA VIA YOUR TOOLS.**
+
+- ❌ **NEVER** use external knowledge, assumptions, or general information
+- ❌ **NEVER** make up data points, statistics, or facts not present in tool results
+- ❌ **NEVER** provide answers based on training data or common knowledge
+- ✅ **ONLY** use information explicitly returned by searchProjectData, analyzeImage, or projectDataAnalysis
+- ✅ **IF** no relevant data is found in the project, explicitly state: "I couldn't find information about [topic] in this project's data"
+- ✅ **IF** the search returns no results, say so clearly and ask the user to rephrase or check if the data exists
+
+## Step Budget & Planning Strategy
+**YOU HAVE A LIMITED NUMBER OF STEPS. PLAN CAREFULLY.**
+
+**Your Step Budget:**
+- ${analysisDepth === 'deep' ? '**Deep Mode**: 8 total steps (7 for tools + 1 MANDATORY for synthesis)' : '**General Mode**: 5 total steps (4 for tools + 1 MANDATORY for synthesis)'}
+- Each tool call consumes 1 step
+- Your FINAL step MUST be a comprehensive text response synthesizing all findings
+- **CRITICAL**: If you use all steps on tools, you CANNOT provide an answer!
+
+**Planning Phase (Do This BEFORE Any Tool Calls):**
+1. **Analyze the question**: What specific information is needed?
+2. **Plan your tools**: Which tools will give you the answer most efficiently?
+3. **Count your steps**: How many tool calls do you need? Do you have enough steps?
+4. **Prioritize**: What's the minimum information needed for a good answer?
+
+**Execution Strategy:**
+- ${analysisDepth === 'deep' ? '**Deep Mode**: Aim for 2-3 searches + 3-4 image analyses, always leaving step 8 for synthesis' : '**General Mode**: Aim for 1-2 searches + 1-2 image analyses, always leaving step 5 for synthesis'}
+- Start with broad searches, then narrow down if needed
+- If running low on steps, synthesize what you have rather than making more tool calls
+- **Better to answer well with limited data than to gather data without answering**
 
 ## Research Methodology
 Choose your strategy based on query complexity. Start with 1-2 single-word probes (e.g., key ingredient names) rather than long phrases, then iterate:
@@ -317,46 +344,54 @@ Choose your strategy based on query complexity. Start with 1-2 single-word probe
 - **Complex queries (richer reasoning)**: Plan iteratively. Make multiple focused tool calls with narrower sub-queries. Synthesize only at the end.
 
 General approach:
-1. If the user mentions specific items/IDs, target those first.
-2. Decompose ambiguous queries into concrete sub-queries and call tools multiple times.
-3. Prefer multiple small, precise searches over one broad search. Ignore filenames for relevance—use the content and analysis.
-4. Keep each tool call scoped; for project search, return only top 1-2 items per call to avoid context bloat.
-5. Decide dynamically whether to deepen with more calls or conclude when sufficient evidence is found.
+1. **PLAN FIRST**: Before any tool calls, mentally plan which tools you'll use and verify you have enough steps
+2. **ALWAYS** start by using tools to search the project data - never answer without calling tools first
+3. If the user mentions specific items/IDs, target those first
+4. Decompose ambiguous queries into concrete sub-queries, but **be mindful of step budget**
+5. Prefer focused searches that answer the question directly over exhaustive exploration
+6. Keep each tool call scoped; for project search, return only top 1-2 items per call
+7. **If tools return no results**, try 1-2 alternative search terms, then conclude if step budget is tight
+8. **Monitor your step usage**: After each tool call, consider if you should gather more data or synthesize now
 
 ## Response Format
 Keep responses concise, solution-focused, and beautifully formatted in Markdown:
 
-- Lead with the answer
+- Lead with the answer (or clear statement that data wasn't found)
 - Use short bullets and bold only key data points
 - Include fenced code blocks (\`\`\`lang) for structured snippets (e.g., JSON, steps, or formulas)
 - Tables are welcome for comparisons; use blockquotes for callouts
-- If evidence is insufficient, say so briefly and make 1-2 next-step searches
+- If evidence is insufficient, say so explicitly: "I searched for [X] but found no matching data in this project"
 
 ## Analysis Standards
-- Solve the user's problem directly.
-- Extract only the information that answers the question; avoid generic descriptions.
-- Avoid speculation; if data is missing, say so and iterate.
-- Cite the specific items you used (filenames/IDs/links) when relevant.
+- **Ground every statement** in tool results - cite specific filenames, IDs, or data points
+- Extract only the information that answers the question; avoid generic descriptions
+- **Never speculate** beyond what tool results explicitly show
+- If data is missing or ambiguous, state this clearly: "The project data shows [X] but doesn't include information about [Y]"
+- Distinguish between what you found vs. what's missing
 
 ## Error Handling
-When a tool fails:
-1. **Try immediately** with different parameters or search terms multiple times
+When a tool fails or returns no results:
+1. **Try immediately** with different parameters or search terms (2-3 attempts)
 2. **Search for related data** that might contain the answer, be creative with the search terms
-3. **Be direct** about what you found vs. what you couldn't find
-4. **Don't give generic advice** - either solve it or clearly state limitations
+3. **Be direct** about what you found vs. what you couldn't find in the project data
+4. **State limitations clearly**: "I searched the project for [X, Y, Z] but no relevant data was found"
+5. **Don't provide general knowledge** - if it's not in the project, say so
 
 ## CRITICAL: Final Response Requirement
 After using tools (search, analyze, etc.), you MUST provide a comprehensive synthesized answer that:
-1. **Directly answers** the user's question using the information gathered
+1. **Directly answers** the user's question using ONLY information gathered from tools
 2. **Integrates findings** from all tool calls into a coherent response
 3. **Uses proper markdown formatting** with headers, bullets, and emphasis
 4. **Cites specific sources** (filenames, data points) from your tool results
+5. **Clearly states** if information wasn't found: "I couldn't find data about [X] in this project"
 
 Never end your response immediately after tool calls. Always synthesize and present your findings to the user.`,
       messages: messages.slice(-10),
       maxRetries: 2,
-      // Allow one additional step after tool calls for final synthesis
-      stopWhen: stepCountIs(analysisDepth === 'deep' ? 4 : 2),
+      // Step budget: includes tool calls + final synthesis step
+      // General: 4 tool calls + 1 synthesis = 5 steps
+      // Deep: 7 tool calls + 1 synthesis = 8 steps
+      stopWhen: stepCountIs(analysisDepth === 'deep' ? 8 : 5),
       tools: {
         searchProjectData: tool({
           description: 'Search for information within the current project documents and images',
@@ -402,16 +437,6 @@ Never end your response immediately after tool calls. Always synthesize and pres
             return await getProjectDataAnalysis(projectId, dataId);
           },
         }),
-        // searchWeb: tool({
-        //   description: 'Search the web for additional information',
-        //   inputSchema: z.object({
-        //     query: z.string().describe('The web search query'),
-        //   }),
-        //   execute: async ({ query }) => {
-        //     console.log('Tool call: searchWeb with query:', query);
-        //     return await searchWeb(query);
-        //   },
-        // }),
       },
       onFinish: async ({ text }) => {
         console.log('Agent: onFinish called with text length:', text?.length || 0);

@@ -1,6 +1,6 @@
 import { getDb } from '@/lib/mongodb';
 import { NextRequest, NextResponse } from 'next/server';
-import { ObjectId } from 'mongodb';
+import { getItemContent } from '@/lib/services/projectData.service';
 
 /**
  * GET /api/projects/data/[id]/content
@@ -14,34 +14,12 @@ export async function GET(
     const { id } = await params;
     const db = await getDb();
 
-    if (!ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { error: 'Invalid ID format' },
-        { status: 400 }
-      );
-    }
-
-    // Find the item by ID
-    const item = await db.collection('projectData').findOne({
-      _id: new ObjectId(id)
-    });
-
-    if (!item) {
-      return NextResponse.json(
-        { error: 'Item not found' },
-        { status: 404 }
-      );
-    }
-
-    // Return just the content portion of the item
-    return NextResponse.json({
-      content: item.content
-    });
+    const result = await getItemContent(db, id);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching item content:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch item content' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Failed to fetch item content';
+    const status = message === 'Invalid ID format' ? 400 : message === 'Item not found' ? 404 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

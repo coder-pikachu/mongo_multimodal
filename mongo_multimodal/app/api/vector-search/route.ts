@@ -39,7 +39,15 @@ export async function POST(req: NextRequest) {
     };
 
     const results = await performVectorSearch(db, searchQuery, searchType, searchConfig);
-    return NextResponse.json({ results });
+
+    // Exclude base64 content from image results for performance
+    const optimizedResults = results.map(result => ({
+      ...result,
+      _id: result._id.toString(),
+      content: result.type === 'image' ? { text: null, base64: null } : result.content
+    }));
+
+    return NextResponse.json({ results: optimizedResults });
   } catch (error) {
     console.error('Vector search error:', error);
     return NextResponse.json(

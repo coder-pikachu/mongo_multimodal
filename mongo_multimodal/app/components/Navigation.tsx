@@ -1,14 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Search, LogOut, FolderOpen, Moon, Sun, Image as ImageIcon, Network } from 'lucide-react';
+import { Home, Search, LogOut, FolderOpen, Moon, Sun, Network } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 
 export function Navigation() {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
+  const pathname = usePathname();
+
+  const isActive = (path: string) => {
+    if (path === '/') return pathname === '/';
+    return pathname?.startsWith(path);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -41,35 +48,44 @@ export function Navigation() {
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link
                 href="/"
-                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors ${
+                  isActive('/')
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'
+                }`}
               >
                 <Home className="w-4 h-4 mr-2" />
                 Home
               </Link>
               <Link
                 href="/projects"
-                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors ${
+                  isActive('/projects')
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'
+                }`}
               >
                 <FolderOpen className="w-4 h-4 mr-2" />
                 Projects
               </Link>
               <Link
                 href="/search"
-                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors ${
+                  isActive('/search')
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'
+                }`}
               >
                 <Search className="w-4 h-4 mr-2" />
                 Search
               </Link>
               <Link
-                href="/vector-search"
-                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300"
-              >
-                <ImageIcon className="w-4 h-4 mr-2" />
-                Vector Search
-              </Link>
-              <Link
                 href="/solution-architecture"
-                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors ${
+                  isActive('/solution-architecture')
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-zinc-900 dark:text-zinc-100 hover:text-zinc-500 dark:hover:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'
+                }`}
               >
                 <Network className="w-4 h-4 mr-2" />
                 Architecture

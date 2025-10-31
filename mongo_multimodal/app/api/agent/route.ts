@@ -141,6 +141,7 @@ async function analyzeImage(projectId: string, dataId: string, userQuery: string
     }
 
     return JSON.stringify({
+      dataId: dataId,
       filename: projectData.metadata?.filename,
       originalSizeKB: compressed.originalSizeKB,
       compressedSizeKB: compressed.sizeKB,
@@ -316,11 +317,35 @@ You have access to three powerful research tools:
 - ✅ **IF** no relevant data is found in the project, explicitly state: "I couldn't find information about [topic] in this project's data"
 - ✅ **IF** the search returns no results, say so clearly and ask the user to rephrase or check if the data exists
 
+## CRITICAL: Citation Format (MANDATORY)
+**YOU MUST CITE ALL SOURCES IN YOUR RESPONSES.**
+
+Every piece of information you present MUST include an inline citation showing where it came from:
+
+**Citation Formats:**
+- **For search results**: \`[Source: filename.ext, Score: 0.XX]\`
+- **For image analyses**: \`[Image: filename.ext]\`
+- **For stored analyses**: \`[Analysis: filename.ext]\`
+
+**End-of-Response Source List:**
+After your analysis, include a "**## Sources Referenced**" section listing all files/images you consulted with their IDs:
+- filename.ext (ID: abc123...)
+- another-file.png (ID: def456...)
+
+**Example Response:**
+"The Q3 revenue chart shows 15% growth \`[Source: q3-revenue.png, Score: 0.92]\`. The breakdown \`[Image: detailed-breakdown.png]\` indicates the primary driver was the enterprise segment."
+
+**## Sources Referenced**
+- q3-revenue.png (ID: 67890abc...)
+- detailed-breakdown.png (ID: 12345def...)
+
+**IMPORTANT**: Citations must be inline with the information. Every claim needs a source.
+
 ## Step Budget & Planning Strategy
 **YOU HAVE A LIMITED NUMBER OF STEPS. PLAN CAREFULLY.**
 
 **Your Step Budget:**
-- ${analysisDepth === 'deep' ? '**Deep Mode**: 8 total steps (7 for tools + 1 MANDATORY for synthesis)' : '**General Mode**: 5 total steps (4 for tools + 1 MANDATORY for synthesis)'}
+- ${analysisDepth === 'deep' ? '**Deep Mode**: 12 total steps (11 for tools + 1 MANDATORY for synthesis)' : '**General Mode**: 7 total steps (6 for tools + 1 MANDATORY for synthesis)'}
 - Each tool call consumes 1 step
 - Your FINAL step MUST be a comprehensive text response synthesizing all findings
 - **CRITICAL**: If you use all steps on tools, you CANNOT provide an answer!
@@ -332,7 +357,7 @@ You have access to three powerful research tools:
 4. **Prioritize**: What's the minimum information needed for a good answer?
 
 **Execution Strategy:**
-- ${analysisDepth === 'deep' ? '**Deep Mode**: Aim for 2-3 searches + 3-4 image analyses, always leaving step 8 for synthesis' : '**General Mode**: Aim for 1-2 searches + 1-2 image analyses, always leaving step 5 for synthesis'}
+- ${analysisDepth === 'deep' ? '**Deep Mode**: Aim for 2-3 searches + 3-4 image analyses, always leaving step 8 for synthesis' : '**General Mode**: Aim for 1-2 searches + 1-2 image analyses, always leaving step 5-7 for synthesis'}
 - Start with broad searches, then narrow down if needed
 - If running low on steps, synthesize what you have rather than making more tool calls
 - **Better to answer well with limited data than to gather data without answering**
@@ -391,7 +416,7 @@ Never end your response immediately after tool calls. Always synthesize and pres
       // Step budget: includes tool calls + final synthesis step
       // General: 4 tool calls + 1 synthesis = 5 steps
       // Deep: 7 tool calls + 1 synthesis = 8 steps
-      stopWhen: stepCountIs(analysisDepth === 'deep' ? 8 : 5),
+      stopWhen: stepCountIs(analysisDepth === 'deep' ? 12 : 7),
       tools: {
         searchProjectData: tool({
           description: 'Search for information within the current project documents and images',

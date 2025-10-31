@@ -148,22 +148,8 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                         currentToolName = toolCall.toolName;
                                         currentToolCallId = toolCall.toolCallId;
                                         currentToolInput = toolCall.args;
-
-                                        // Add visual indicator
-                                        const indicator = currentToolName === 'searchProjectData'
-                                            ? '\n\n🔍 Searching project data...\n'
-                                            : currentToolName === 'analyzeImage'
-                                            ? '\n\n🖼️ Analyzing image...\n'
-                                            : currentToolName === 'projectDataAnalysis'
-                                            ? '\n\n📄 Fetching analysis...\n'
-                                            : '\n\n🔧 Using tool...\n';
-
-                                        assistantMessage.content += indicator;
-                                        setMessages(prev => prev.map(m =>
-                                            m.id === assistantMessage.id
-                                                ? { ...m, content: assistantMessage.content }
-                                                : m
-                                        ));
+                                        // Tool calls are displayed in the expandable section below
+                                        // No need to add indicators to message content
                                     } catch (e) {
                                         console.error('Failed to parse tool call:', e);
                                     }
@@ -182,14 +168,6 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                                 timestamp: new Date()
                                             });
                                         }
-
-                                        // Add completion indicator
-                                        assistantMessage.content += '✓ Completed.\n\n';
-                                        setMessages(prev => prev.map(m =>
-                                            m.id === assistantMessage.id
-                                                ? { ...m, content: assistantMessage.content }
-                                                : m
-                                        ));
 
                                         // Reset current tool
                                         currentToolName = '';
@@ -329,11 +307,58 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                         h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
                                         h2: ({children}) => <h2 className="text-base font-semibold mb-2">{children}</h2>,
                                         h3: ({children}) => <h3 className="text-sm font-medium mb-1">{children}</h3>,
-                                        p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                                        p: ({children}) => {
+                                            // Highlight citations in paragraphs
+                                            if (typeof children === 'string') {
+                                                const citationRegex = /\[(?:Source|Image|Analysis): ([^\]]+)\]/g;
+                                                const parts = [];
+                                                let lastIndex = 0;
+                                                let match;
+
+                                                while ((match = citationRegex.exec(children)) !== null) {
+                                                    // Add text before citation
+                                                    if (match.index > lastIndex) {
+                                                        parts.push(children.substring(lastIndex, match.index));
+                                                    }
+                                                    // Add citation as badge
+                                                    const citationType = match[0].startsWith('[Source') ? 'source' : match[0].startsWith('[Image') ? 'image' : 'analysis';
+                                                    const badgeColor = citationType === 'source' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                                                                       citationType === 'image' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                                                                       'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300';
+                                                    parts.push(
+                                                        <span key={match.index} className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ml-1 ${badgeColor}`}>
+                                                            {match[0]}
+                                                        </span>
+                                                    );
+                                                    lastIndex = match.index + match[0].length;
+                                                }
+
+                                                // Add remaining text
+                                                if (lastIndex < children.length) {
+                                                    parts.push(children.substring(lastIndex));
+                                                }
+
+                                                if (parts.length > 1) {
+                                                    return <p className="mb-2 last:mb-0">{parts}</p>;
+                                                }
+                                            }
+                                            return <p className="mb-2 last:mb-0">{children}</p>;
+                                        },
                                         ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
                                         ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
                                         li: ({children}) => <li className="text-sm">{children}</li>,
-                                        code: ({children}) => <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-xs">{children}</code>,
+                                        code: ({children}) => {
+                                            // Also highlight citations in inline code
+                                            const text = String(children);
+                                            if (text.match(/^\[(?:Source|Image|Analysis):/)) {
+                                                const citationType = text.startsWith('[Source') ? 'source' : text.startsWith('[Image') ? 'image' : 'analysis';
+                                                const badgeColor = citationType === 'source' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                                                                   citationType === 'image' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                                                                   'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300';
+                                                return <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeColor}`}>{children}</span>;
+                                            }
+                                            return <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-xs">{children}</code>;
+                                        },
                                         pre: ({children}) => <pre className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-xs overflow-x-auto mb-2">{children}</pre>,
                                         blockquote: ({children}) => <blockquote className="border-l-2 border-gray-300 pl-3 italic text-gray-600 dark:text-gray-400 mb-2">{children}</blockquote>,
                                         table: ({children}) => <table className="border-collapse border border-gray-300 text-xs mb-2">{children}</table>,
@@ -381,8 +406,10 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                             <div className="flex items-center gap-2 font-semibold mb-2">
                                                 {toolCall.toolName === 'searchProjectData' ? (
                                                     <Search className="h-3 w-3" />
-                                                ) : toolCall.toolName === 'viewImage' ? (
+                                                ) : toolCall.toolName === 'analyzeImage' ? (
                                                     <Eye className="h-3 w-3" />
+                                                ) : toolCall.toolName === 'projectDataAnalysis' ? (
+                                                    <BrainCircuit className="h-3 w-3" />
                                                 ) : (
                                                     <Globe className="h-3 w-3" />
                                                 )}
@@ -399,28 +426,71 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                                 )}
                                                 {toolCall.output && (
                                                     <div>
-                                                        <span className="font-medium text-gray-600">Output Summary:</span>
-                                                        <pre className="mt-1 bg-white dark:bg-gray-900 p-2 rounded overflow-auto max-h-32 text-xs">
+                                                        <span className="font-medium text-gray-600 dark:text-gray-300">Output Summary:</span>
+                                                        <div className="mt-1 bg-white dark:bg-gray-900 p-2 rounded overflow-auto max-h-32 text-xs">
                                                             {(() => {
                                                                 try {
                                                                     const output = typeof toolCall.output === 'string'
                                                                         ? JSON.parse(toolCall.output)
                                                                         : toolCall.output;
 
-                                                                    // Summarize output for better readability
+                                                                    // Format search results with IDs
                                                                     if (output.results && Array.isArray(output.results)) {
-                                                                        return `Found ${output.total || output.results.length} results:\n${
-                                                                            output.results.slice(0, 3).map((r: { metadata?: { filename?: string }, score: number }, i: number) =>
-                                                                                `${i + 1}. ${r.metadata?.filename || 'Unknown'} (score: ${r.score})`
-                                                                            ).join('\n')
-                                                                        }${output.results.length > 3 ? '\n...' : ''}`;
+                                                                        return (
+                                                                            <div className="space-y-1">
+                                                                                <div className="font-semibold text-blue-600 dark:text-blue-400">
+                                                                                    Found {output.total || output.results.length} results:
+                                                                                </div>
+                                                                                {output.results.slice(0, 3).map((r: { id?: string, filename?: string, metadata?: { filename?: string }, score: number }, i: number) => (
+                                                                                    <div key={i} className="pl-2 border-l-2 border-gray-300 dark:border-gray-600">
+                                                                                        <div className="font-medium">{i + 1}. {r.filename || r.metadata?.filename || 'Unknown'}</div>
+                                                                                        <div className="text-gray-600 dark:text-gray-400">Score: {r.score?.toFixed(2)}</div>
+                                                                                        {r.id && <div className="text-gray-500 dark:text-gray-500 text-[10px]">ID: {r.id.substring(0, 12)}...</div>}
+                                                                                    </div>
+                                                                                ))}
+                                                                                {output.results.length > 3 && <div className="text-gray-500 dark:text-gray-400">...and {output.results.length - 3} more</div>}
+                                                                            </div>
+                                                                        );
                                                                     }
-                                                                    return JSON.stringify(output, null, 2);
+
+                                                                    // Format image analysis with dataId and filename
+                                                                    if (output.dataId && output.analysis) {
+                                                                        return (
+                                                                            <div className="space-y-1">
+                                                                                <div className="font-semibold text-green-600 dark:text-green-400">
+                                                                                    Analyzed: {output.filename || 'Unknown'}
+                                                                                </div>
+                                                                                <div className="text-gray-500 dark:text-gray-500 text-[10px]">ID: {output.dataId.substring(0, 12)}...</div>
+                                                                                <div className="text-gray-600 dark:text-gray-400">Size: {output.compressedSizeKB}KB | Tokens: ~{output.estimatedTokens}</div>
+                                                                                <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-[10px] max-h-20 overflow-auto">
+                                                                                    {String(output.analysis).substring(0, 200)}...
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Format stored analysis
+                                                                    if (output.id && output.analysis) {
+                                                                        return (
+                                                                            <div className="space-y-1">
+                                                                                <div className="font-semibold text-purple-600 dark:text-purple-400">
+                                                                                    Fetched: {output.filename || 'Unknown'}
+                                                                                </div>
+                                                                                <div className="text-gray-500 dark:text-gray-500 text-[10px]">ID: {output.id.substring(0, 12)}...</div>
+                                                                                {output.analysis.description && (
+                                                                                    <div className="text-gray-600 dark:text-gray-400">{output.analysis.description.substring(0, 100)}...</div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Fallback to JSON
+                                                                    return <pre>{JSON.stringify(output, null, 2)}</pre>;
                                                                 } catch {
-                                                                    return String(toolCall.output);
+                                                                    return <pre>{String(toolCall.output)}</pre>;
                                                                 }
                                                             })()}
-                                                        </pre>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>

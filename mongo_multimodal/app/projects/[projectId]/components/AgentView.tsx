@@ -1,13 +1,18 @@
 
 'use client'
 import { useState, useEffect, useCallback } from 'react';
-import { Bot, User, Send, ChevronDown, ChevronRight, BrainCircuit, History, MessageSquare, Image as ImageIcon, Loader2, Search, Globe, Eye, ChevronUp } from 'lucide-react';
-import { useSearchResult } from './SearchResultContext';
-import { Message } from '@/types/clientTypes';
+import { Bot, User, Send, ChevronDown, ChevronRight, BrainCircuit, History, MessageSquare, Image as ImageIcon, Loader2, Search, Globe, Eye, ChevronUp, Copy, Check } from 'lucide-react';
+import { useSelection } from './SelectionContext';
+import { Message, AgentPlan, ConversationReference } from '@/types/clientTypes';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github.css';
+import { PlanCard } from './Agent/PlanCard';
+import { SelectedContextBanner } from './Agent/SelectedContextBanner';
+import { StepProgressTracker } from './Agent/StepProgressTracker';
+import { ReferencesPanel } from './Agent/ReferencesPanel';
+import { ImagePreviewModal } from './ImagePreviewModal';
 
 interface ToolCallMetadata {
     toolName: string;
@@ -21,7 +26,7 @@ interface AgentViewProps {
 }
 
 export default function AgentView({ projectId }: AgentViewProps) {
-    const [currentSessionId, setCurrentSessionId] = useState<string>(`session_${Date.now()}`);
+    const [currentSessionId, setCurrentSessionId] = useState<string>('');
     const [savedConversations, setSavedConversations] = useState<Array<{
         _id: string;
         sessionId: string;
@@ -32,7 +37,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
     const [conversationsLoading, setConversationsLoading] = useState(false);
     const [showConversations, setShowConversations] = useState(false);
     const [analysisDepth, setAnalysisDepth] = useState<'general' | 'deep'>('general');
-    const { selectedResult } = useSearchResult();
+    const { selectedItems, agentContext } = useSelection();
 
     // Manual state management instead of useChat
     const [messages, setMessages] = useState<Message[]>([]);
@@ -41,8 +46,34 @@ export default function AgentView({ projectId }: AgentViewProps) {
     const [toolCallsMetadata, setToolCallsMetadata] = useState<Map<string, ToolCallMetadata[]>>(new Map());
     const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(new Set());
 
+    // Plan and progress tracking
+    const [currentPlan, setCurrentPlan] = useState<AgentPlan | null>(null);
+    const [currentStep, setCurrentStep] = useState<number>(0);
+    const [references, setReferences] = useState<ConversationReference[]>([]);
+    const [previewDataId, setPreviewDataId] = useState<string | null>(null);
+    const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+    const [completedPlans, setCompletedPlans] = useState<Map<string, AgentPlan>>(new Map());
+    const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set());
+
+    // Initialize session ID on client side only to avoid hydration mismatch
+    useEffect(() => {
+        if (!currentSessionId) {
+            setCurrentSessionId(`session_${Date.now()}`);
+        }
+    }, []);
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setInput(e.target.value);
+    };
+
+    const handleCopyResponse = async (messageId: string, content: string) => {
+        try {
+            await navigator.clipboard.writeText(content);
+            setCopiedMessageId(messageId);
+            setTimeout(() => setCopiedMessageId(null), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -61,6 +92,11 @@ export default function AgentView({ projectId }: AgentViewProps) {
         setIsLoading(true);
 
         try {
+            // Extract data IDs from selected items if available
+            const selectedDataIds = selectedItems.length > 0
+                ? selectedItems.map(item => item._id)
+                : undefined;
+
             const response = await fetch('/api/agent', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -71,7 +107,8 @@ export default function AgentView({ projectId }: AgentViewProps) {
                     })),
                     projectId,
                     sessionId: currentSessionId,
-                    analysisDepth
+                    analysisDepth,
+                    selectedDataIds // Pass the selected item IDs
                 })
             });
 
@@ -92,7 +129,6 @@ export default function AgentView({ projectId }: AgentViewProps) {
                 let buffer = '';
                 const messageToolCalls: ToolCallMetadata[] = [];
                 let currentToolName = '';
-                let currentToolCallId = '';
                 let currentToolInput: Record<string, unknown> | undefined = undefined;
 
                 while (true) {
@@ -129,7 +165,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                                     : m
                                             ));
                                         }
-                                    } catch (e) {
+                                    } catch {
                                         // If not JSON, treat as plain text
                                         if (payload) {
                                             assistantMessage.content += payload;
@@ -146,7 +182,6 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                     try {
                                         const toolCall = JSON.parse(payload);
                                         currentToolName = toolCall.toolName;
-                                        currentToolCallId = toolCall.toolCallId;
                                         currentToolInput = toolCall.args;
                                         // Tool calls are displayed in the expandable section below
                                         // No need to add indicators to message content
@@ -167,6 +202,25 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                                 output: result.result,
                                                 timestamp: new Date()
                                             });
+
+                                            // Handle plan tool
+                                            if (currentToolName === 'planQuery' && result.result) {
+                                                try {
+                                                    const planResult = typeof result.result === 'string'
+                                                        ? JSON.parse(result.result)
+                                                        : result.result;
+
+                                                    if (planResult.plan) {
+                                                        setCurrentPlan(planResult.plan);
+                                                        setCurrentStep(1); // Start at step 1 after planning
+                                                    }
+                                                } catch (e) {
+                                                    console.error('Failed to parse plan:', e);
+                                                }
+                                            }
+
+                                            // Increment step counter for each tool call
+                                            setCurrentStep(prev => prev + 1);
                                         }
 
                                         // Reset current tool
@@ -194,12 +248,89 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         newMap.set(assistantMessage.id, messageToolCalls);
                         return newMap;
                     });
+
+                    // Extract references from tool calls
+                    const extractedRefs: ConversationReference[] = [];
+                    messageToolCalls.forEach((toolCall, index) => {
+                        try {
+                            const output = typeof toolCall.output === 'string'
+                                ? JSON.parse(toolCall.output)
+                                : toolCall.output;
+
+                            // Extract from search results
+                            if (toolCall.toolName === 'searchProjectData' && output?.results) {
+                                output.results.forEach((result: { id?: string; filename?: string; metadata?: { filename?: string }; score?: number }) => {
+                                    if (result.id) {
+                                        extractedRefs.push({
+                                            type: 'projectData',
+                                            dataId: result.id,
+                                            title: result.filename || result.metadata?.filename || 'Unknown',
+                                            usedInStep: index + 1,
+                                            toolCall: toolCall.toolName,
+                                            score: result.score
+                                        });
+                                    }
+                                });
+                            }
+
+                            // Extract from image analysis
+                            if (toolCall.toolName === 'analyzeImage' && output?.dataId) {
+                                extractedRefs.push({
+                                    type: 'projectData',
+                                    dataId: output.dataId,
+                                    title: output.filename || 'Unknown',
+                                    usedInStep: index + 1,
+                                    toolCall: toolCall.toolName,
+                                });
+                            }
+
+                            // Extract from stored analysis
+                            if (toolCall.toolName === 'projectDataAnalysis' && output?.id) {
+                                extractedRefs.push({
+                                    type: 'projectData',
+                                    dataId: output.id,
+                                    title: output.filename || 'Unknown',
+                                    usedInStep: index + 1,
+                                    toolCall: toolCall.toolName,
+                                });
+                            }
+
+                            // Extract from web search
+                            if (toolCall.toolName === 'searchWeb' && output?.url) {
+                                extractedRefs.push({
+                                    type: 'web',
+                                    url: output.url,
+                                    title: output.title || 'Web Search Result',
+                                    usedInStep: index + 1,
+                                    toolCall: toolCall.toolName,
+                                });
+                            }
+                        } catch (e) {
+                            console.error('Failed to extract references from tool call:', e);
+                        }
+                    });
+
+                    // Update references state
+                    if (extractedRefs.length > 0) {
+                        setReferences(prev => [...prev, ...extractedRefs]);
+                    }
                 }
             }
         } catch (error) {
             console.error('Error:', error);
         } finally {
             setIsLoading(false);
+            // Save completed plan for this message before resetting
+            if (currentPlan && assistantMessage.id) {
+                setCompletedPlans(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(assistantMessage.id, currentPlan);
+                    return newMap;
+                });
+            }
+            // Reset plan and step tracking after completion
+            setCurrentPlan(null);
+            setCurrentStep(0);
         }
     };
 
@@ -221,31 +352,13 @@ export default function AgentView({ projectId }: AgentViewProps) {
     loadConversations();
   }, [loadConversations]);
 
-        // Initialize with context if available
+        // Initialize with context if available from selection
     useEffect(() => {
-        if (selectedResult) {
-            // Include the data ID if available for direct access
-            const dataId = '_id' in selectedResult ? (selectedResult as { _id: string })._id :
-                         'id' in selectedResult ? (selectedResult as { id: string }).id : null;
-
-            let contextMessage = `I want to research about "${selectedResult.metadata?.filename}".`;
-
-            // Add the data ID for direct access
-            if (dataId) {
-                contextMessage += ` The data ID is: ${dataId}.`;
-            }
-
-            // Add description if available
-            if (selectedResult.analysis?.description) {
-                contextMessage += ` This file contains: ${selectedResult.analysis.description}`;
-            } else {
-                contextMessage += ' Please help me understand this content.';
-            }
-
-            setInput(contextMessage);
+        if (agentContext && selectedItems.length > 0) {
+            setInput(agentContext);
             setShowConversations(false);
         }
-    }, [selectedResult]);
+    }, [agentContext, selectedItems]);
 
     const loadConversation = async (sessionId: string) => {
         try {
@@ -275,10 +388,15 @@ export default function AgentView({ projectId }: AgentViewProps) {
         setCurrentSessionId(newSessionId);
         setMessages([]);
         setShowConversations(false);
+        setReferences([]);
+        setCurrentPlan(null);
+        setCurrentStep(0);
     };
 
     const renderMessage = (m: Message) => {
         const messageToolCalls = toolCallsMetadata.get(m.id);
+        const messagePlan = completedPlans.get(m.id);
+        const showPlan = expandedPlans.has(m.id);
 
         return (
             <div key={m.id} className={`flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
@@ -289,10 +407,10 @@ export default function AgentView({ projectId }: AgentViewProps) {
                 )}
                 <div className={`flex flex-col gap-2 max-w-xl ${m.role === 'user' ? 'items-end' : ''}`}>
                     <div
-                        className={`px-4 py-2 rounded-lg ${
+                        className={`relative group px-4 py-2 rounded-lg ${
                             m.role === 'user'
                                 ? 'bg-blue-500 text-white'
-                                : 'bg-white dark:bg-gray-800 border dark:border-gray-700'
+                                : 'bg-white dark:bg-gray-900 border dark:border-gray-800'
                         }`}
                     >
                         {m.role === 'user' ? (
@@ -372,7 +490,76 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                 </ReactMarkdown>
                             </div>
                         )}
+                        {/* Copy button for assistant messages */}
+                        {m.role === 'assistant' && (
+                            <button
+                                onClick={() => handleCopyResponse(m.id, m.content)}
+                                className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                                title="Copy response"
+                            >
+                                {copiedMessageId === m.id ? (
+                                    <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                                ) : (
+                                    <Copy className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
+                                )}
+                            </button>
+                        )}
                     </div>
+
+                    {/* Plan viewing button */}
+                    {m.role === 'assistant' && messagePlan && (
+                        <div className="mt-1">
+                            <button
+                                onClick={() => {
+                                    setExpandedPlans(prev => {
+                                        const newSet = new Set(prev);
+                                        if (newSet.has(m.id)) {
+                                            newSet.delete(m.id);
+                                        } else {
+                                            newSet.add(m.id);
+                                        }
+                                        return newSet;
+                                    });
+                                }}
+                                className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 px-3 py-1 bg-blue-50 dark:bg-gray-900 rounded"
+                            >
+                                {showPlan ? (
+                                    <ChevronUp className="h-3 w-3" />
+                                ) : (
+                                    <ChevronDown className="h-3 w-3" />
+                                )}
+                                View planning
+                            </button>
+
+                            {showPlan && (
+                                <div className="mt-2 p-3 bg-blue-50 dark:bg-gray-900 rounded border border-blue-200 dark:border-gray-800">
+                                    <h4 className="text-xs font-semibold text-blue-900 dark:text-blue-400 mb-2">Agent Planning</h4>
+                                    <div className="text-xs space-y-2">
+                                        <div>
+                                            <span className="font-medium text-blue-800 dark:text-blue-200">Steps:</span>
+                                            <ol className="list-decimal list-inside mt-1 space-y-1 text-gray-700 dark:text-gray-300">
+                                                {messagePlan.steps.map((step, idx) => (
+                                                    <li key={idx}>{step}</li>
+                                                ))}
+                                            </ol>
+                                        </div>
+                                        {messagePlan.toolsToUse && messagePlan.toolsToUse.length > 0 && (
+                                            <div>
+                                                <span className="font-medium text-blue-800 dark:text-blue-200">Tools planned:</span>
+                                                <span className="ml-2 text-gray-700 dark:text-gray-300">{messagePlan.toolsToUse.join(', ')}</span>
+                                            </div>
+                                        )}
+                                        {messagePlan.estimatedToolCalls && (
+                                            <div>
+                                                <span className="font-medium text-blue-800 dark:text-blue-200">Estimated tool calls:</span>
+                                                <span className="ml-2 text-gray-700 dark:text-gray-300">{messagePlan.estimatedToolCalls}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Tool call metadata */}
                     {m.role === 'assistant' && messageToolCalls && messageToolCalls.length > 0 && (
@@ -389,7 +576,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                         return newSet;
                                     });
                                 }}
-                                className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 px-3 py-1 bg-gray-50 dark:bg-gray-800 rounded"
+                                className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1 bg-gray-50 dark:bg-gray-900 rounded"
                             >
                                 {expandedToolCalls.has(m.id) ? (
                                     <ChevronUp className="h-3 w-3" />
@@ -402,7 +589,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                             {expandedToolCalls.has(m.id) && (
                                 <div className="mt-2 space-y-2">
                                     {messageToolCalls.map((toolCall, idx) => (
-                                        <div key={idx} className="bg-gray-50 dark:bg-gray-800 rounded p-3 text-xs border dark:border-gray-700">
+                                        <div key={idx} className="bg-gray-50 dark:bg-gray-900 rounded p-3 text-xs border dark:border-gray-800">
                                             <div className="flex items-center gap-2 font-semibold mb-2">
                                                 {toolCall.toolName === 'searchProjectData' ? (
                                                     <Search className="h-3 w-3" />
@@ -418,8 +605,8 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                             <div className="space-y-2">
                                                 {toolCall.input && (
                                                     <div>
-                                                        <span className="font-medium text-gray-600">Input:</span>
-                                                        <pre className="mt-1 bg-white dark:bg-gray-900 p-2 rounded overflow-auto max-h-32 text-xs">
+                                                        <span className="font-medium text-gray-600 dark:text-gray-300">Input:</span>
+                                                        <pre className="mt-1 bg-white dark:bg-black p-2 rounded overflow-auto max-h-32 text-xs">
                                                             {JSON.stringify(toolCall.input, null, 2)}
                                                         </pre>
                                                     </div>
@@ -427,7 +614,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                                 {toolCall.output && (
                                                     <div>
                                                         <span className="font-medium text-gray-600 dark:text-gray-300">Output Summary:</span>
-                                                        <div className="mt-1 bg-white dark:bg-gray-900 p-2 rounded overflow-auto max-h-32 text-xs">
+                                                        <div className="mt-1 bg-white dark:bg-black p-2 rounded overflow-auto max-h-32 text-xs">
                                                             {(() => {
                                                                 try {
                                                                     const output = typeof toolCall.output === 'string'
@@ -462,7 +649,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                                                                 </div>
                                                                                 <div className="text-gray-500 dark:text-gray-500 text-[10px]">ID: {output.dataId.substring(0, 12)}...</div>
                                                                                 <div className="text-gray-600 dark:text-gray-400">Size: {output.compressedSizeKB}KB | Tokens: ~{output.estimatedTokens}</div>
-                                                                                <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-[10px] max-h-20 overflow-auto">
+                                                                                <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded text-[10px] max-h-20 overflow-auto">
                                                                                     {String(output.analysis).substring(0, 200)}...
                                                                                 </div>
                                                                             </div>
@@ -511,22 +698,22 @@ export default function AgentView({ projectId }: AgentViewProps) {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col h-full dark:bg-black">
+            <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                     <BrainCircuit className="h-6 w-6 text-blue-500" />
                     <span className="font-semibold">Agent Mode</span>
-                    {selectedResult && (
+                    {selectedItems.length > 0 && (
                         <span className="text-sm text-gray-500 flex items-center gap-1">
                             <ImageIcon className="h-3 w-3" />
-                            Context: {selectedResult.metadata?.filename}
+                            {selectedItems.length} item{selectedItems.length > 1 ? 's' : ''} selected
                         </span>
                     )}
                 </div>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setShowConversations(!showConversations)}
-                        className="flex items-center gap-2 px-3 py-1 text-sm bg-gray-100 dark:bg-gray-800 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
+                        className="flex items-center gap-2 px-3 py-1 text-sm bg-gray-100 dark:bg-gray-900 rounded-md hover:bg-gray-200 dark:hover:bg-gray-800"
                     >
                         <History className="h-4 w-4" />
                         History ({savedConversations.length})
@@ -534,7 +721,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                     </button>
                     <button
                         onClick={startNewConversation}
-                        className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                        className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700"
                     >
                         <MessageSquare className="h-4 w-4" />
                         New Chat
@@ -543,7 +730,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
             </div>
 
             {showConversations && (
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-800">
                     <h3 className="font-semibold mb-2">Past Conversations</h3>
                     {conversationsLoading ? (
                         <div className="flex items-center gap-2 text-gray-500">
@@ -558,7 +745,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                 <li key={session._id}>
                                     <button
                                         onClick={() => loadConversation(session._id)}
-                                        className="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        className="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900"
                                     >
                                         <p className="font-medium truncate">{session.firstMessage || 'Untitled conversation'}</p>
                                         <p className="text-sm text-gray-500">
@@ -573,7 +760,32 @@ export default function AgentView({ projectId }: AgentViewProps) {
                 </div>
             )}
 
-            <div className="flex-grow p-4 overflow-y-auto">
+            {/* Selected Context Banner */}
+            <SelectedContextBanner />
+
+            {/* Agent Plan Card */}
+            {currentPlan && (
+                <div className="px-4 pt-4">
+                    <PlanCard
+                        plan={currentPlan}
+                        currentStep={currentStep}
+                        totalSteps={currentPlan.estimatedToolCalls + 1}
+                    />
+                </div>
+            )}
+
+            {/* Step Progress Tracker */}
+            {isLoading && currentPlan && (
+                <div className="px-4 pt-3">
+                    <StepProgressTracker
+                        currentStep={currentStep}
+                        totalSteps={currentPlan.estimatedToolCalls + 1}
+                        stepLabels={currentPlan.steps.slice(0, Math.min(currentPlan.steps.length, 5))}
+                    />
+                </div>
+            )}
+
+            <div className="flex-grow p-4 overflow-y-auto min-h-0">
                 <div className="space-y-4">
                     {messages.map(renderMessage)}
                     {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
@@ -607,7 +819,24 @@ export default function AgentView({ projectId }: AgentViewProps) {
                 )}
             </div>
 
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            {/* References Panel */}
+            {references.length > 0 && (
+                <ReferencesPanel
+                    references={references}
+                    onPreview={(dataId) => setPreviewDataId(dataId)}
+                />
+            )}
+
+            {/* Preview Modal */}
+            {previewDataId && (
+                <ImagePreviewModal
+                    dataId={previewDataId}
+                    projectId={projectId}
+                    onClose={() => setPreviewDataId(null)}
+                />
+            )}
+
+            <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-800">
                 <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <label className="text-sm text-gray-600 dark:text-gray-400">Analysis Depth:</label>
@@ -617,7 +846,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                             className={`px-3 py-1 text-sm rounded-md ${
                                 analysisDepth === 'general'
                                     ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    : 'bg-gray-200 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
                             }`}
                         >
                                                         General (up to 3 analyses)
@@ -628,7 +857,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                             className={`px-3 py-1 text-sm rounded-md ${
                                 analysisDepth === 'deep'
                                     ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    : 'bg-gray-200 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
                             }`}
                         >
                             Deep (up to 5 analyses)
@@ -640,7 +869,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         value={input}
                         onChange={handleInputChange}
                         placeholder="Ask the agent to research a topic..."
-                        className="flex-grow p-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                        className="flex-grow p-2 border rounded-md dark:bg-black dark:border-gray-800"
                         disabled={isLoading}
                     />
                     <button

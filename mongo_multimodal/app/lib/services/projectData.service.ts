@@ -239,7 +239,7 @@ export async function bulkProcessEmbeddings(
 export async function getItemContent(
   db: Db,
   itemId: string
-): Promise<{ content?: { text?: string; base64?: string } }> {
+): Promise<any> {
   if (!ObjectId.isValid(itemId)) {
     throw new Error('Invalid ID format');
   }
@@ -252,5 +252,16 @@ export async function getItemContent(
     throw new Error('Item not found');
   }
 
-  return { content: item.content };
+  // Return the full item with all properties for the preview modal
+  return {
+    _id: item._id.toString(),
+    projectId: item.projectId?.toString() || '',
+    type: item.type,
+    content: item.content,
+    metadata: item.metadata,
+    analysis: item.analysis,
+    embedding: item.embedding,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
+  };
 }

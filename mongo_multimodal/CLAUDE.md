@@ -29,6 +29,9 @@ The codebase follows a clean service layer architecture to eliminate code duplic
 **Service Layer** (`app/lib/services/`)
 - `projectData.service.ts` - All projectData operations (analyze, process, bulk operations)
 - `vectorSearch.service.ts` - Unified vector search with configurable strategies
+- `perplexity.service.ts` - Web search via Perplexity AI API
+- `email.service.ts` - Email sending via Resend API
+- `references.service.ts` - Bidirectional reference tracking between conversations and projectData
 
 **Route Handlers** (`app/api/`)
 - Thin controllers that delegate to service layer
@@ -56,11 +59,15 @@ The application provides three distinct ways to interact with data, each using d
    - Uses `claude-haiku-4-5-20251001` model via `@ai-sdk/anthropic`
 
 3. **Agent Mode** (`/api/agent/route.ts`)
-   - LangGraph-inspired agentic workflow with tools
-   - Uses Vercel AI SDK's `streamText` with tools: `searchProjectData`, `analyzeImage`, `projectDataAnalysis`
+   - LangGraph-inspired agentic workflow with advanced planning and multi-tool support
+   - **Planning Phase**: Agent must create a plan first using `planQuery` tool before execution
+   - **Core Tools**: `searchProjectData`, `searchSimilarItems`, `analyzeImage`, `projectDataAnalysis`
+   - **External Tools** (feature-flagged): `searchWeb` (Perplexity), `sendEmail` (Resend)
+   - **Reference Tracking**: Automatically tracks which projectData items were used in conversations
+   - **Step Execution Tracking**: Records detailed metrics for each tool call (duration, inputs, outputs)
    - Supports multi-step reasoning with `stopWhen: stepCountIs(depth)` parameter
    - Can analyze up to 5 images per query in deep mode
-   - Saves conversation history to MongoDB `conversations` collection
+   - Saves conversation history with plan, tool executions, and references to MongoDB
 
 ### Data Processing Pipeline
 
@@ -131,6 +138,13 @@ The application provides three distinct ways to interact with data, each using d
     facets: Record<string, any>
   },
   embedding?: number[], // 1024-dimensional vector from VoyageAI
+  referencedBy?: Array<{  // NEW: Track which conversations used this data
+    conversationId: ObjectId,
+    sessionId: string,
+    timestamp: Date,
+    context: string,    // What question it helped answer
+    toolCall: string    // Which tool used it
+  }>,
   processedAt?: Date,   // When embedding was generated
   createdAt: Date,
   updatedAt: Date
@@ -148,7 +162,32 @@ The application provides three distinct ways to interact with data, each using d
     content: string    // Base64 image data is stripped before saving
   },
   timestamp: Date,
-  contentCleaned?: boolean
+  contentCleaned?: boolean,
+  plan?: {              // NEW: Agent's execution plan
+    steps: string[],
+    estimatedToolCalls: number,
+    rationale: string,
+    needsExternalData: boolean,
+    toolsToUse: string[]
+  },
+  references?: Array<{  // NEW: Sources used in this conversation
+    type: 'projectData' | 'web' | 'email',
+    dataId?: string,    // For projectData
+    url?: string,       // For web
+    title: string,
+    usedInStep: number,
+    toolCall: string,
+    score?: number      // For search results
+  }>,
+  toolExecutions?: Array<{  // NEW: Detailed tool usage tracking
+    step: number,
+    tool: string,
+    input: Record<string, unknown>,
+    output: unknown,
+    duration: number,
+    tokens?: number,
+    timestamp: Date
+  }>
 }
 ```
 
@@ -167,6 +206,14 @@ OPENAI_API_KEY=...              # Optional, for OpenAI models
 
 # LLM Selection
 LLM_FOR_ANALYSIS=claude         # "claude" or "openai" - controls which provider analyzes images
+
+# Agent External Tools (Optional)
+PERPLEXITY_API_KEY=...          # For web search in agent mode
+AGENT_WEB_SEARCH_ENABLED=true   # Enable/disable web search tool
+EMAIL_API_KEY=...               # Resend API key for email sending
+EMAIL_FROM=noreply@domain.com   # From address for emails
+EMAIL_ENABLED=true              # Enable/disable email tool
+AGENT_PLANNING_ENABLED=true     # Enable/disable planning phase (recommended: true)
 
 # Optional: LangSmith tracing for agent mode
 LANGCHAIN_TRACING_V2=true
@@ -352,7 +399,29 @@ Creates the required `vector_index` in MongoDB Atlas. Index must be created manu
 
 ## Frontend Structure
 
-- **Project Pages**: `/app/projects/[projectId]/page.tsx` renders tabbed interface
+### Agent-Centric UI (Default)
+
+**Layout**: `/app/projects/[projectId]/components/AgentCentricLayout.tsx`
+- Two-column layout: collapsible side panel (384px) + main agent view
+- Side panel modes: Search, Browse, Upload
+- Focus mode and keyboard shortcuts (Cmd+B to toggle)
+- Multi-select with SelectionContext for feeding data to agent
+
+**Key Components**:
+- `SelectionContext.tsx` - Global state for multi-select across panels
+- `ImagePreviewModal.tsx` - Reusable image preview popup with zoom, download, navigation
+- `SidePanel/` - Search, Browse, Upload, SelectionTray components
+- `Agent/` - PlanCard, SelectedContextBanner, StepProgressTracker, ReferencesPanel
+- `AgentView.tsx` - Enhanced with plan tracking, progress visualization, reference extraction
+
+**Features**:
+- Image preview with Eye icon button in Search/Browse/DataExplorer/References
+- Modal with zoom controls, keyboard navigation (←/→), download, ESC to close
+- User Flow: Search/Browse → Select items → Feed to Agent → Watch plan & progress → Review sources
+
+### Legacy Tab Interface (Optional)
+
+Access via query params: `?mode=search`, `?mode=chat`, `?mode=explorer`
 - **Tab Components**: `SearchView.tsx`, `ChatView.tsx`, `AgentView.tsx`, `DataExplorerView.tsx`
 - **Data Explorer**: Shows uploaded files with process/analyze buttons
 - **Batch Processing**: `BatchProcessButton.tsx` processes multiple files sequentially
@@ -399,9 +468,91 @@ Creates the required `vector_index` in MongoDB Atlas. Index must be created manu
 - ✅ Consistent model selection across all endpoints
 - ✅ Single source of truth for business logic
 
+## Enhanced Agent System (Latest)
+
+### Planning Phase
+The agent now includes a **mandatory planning step** before execution:
+- **planQuery Tool**: Agent creates a visible plan showing decomposed steps, tool selection, and estimated tool calls
+- **Transparency**: Users see the agent's strategy before it executes
+- **Budget Awareness**: Agent verifies step budget sufficiency during planning
+- **Adaptability**: Agent can adjust plan if results require different approach
+
+### Expanded Tool Suite
+
+**Core Research Tools (Always Available):**
+1. **planQuery** - Create execution plan (mandatory first step)
+2. **searchProjectData** - Vector search with configurable maxResults (1-10)
+3. **searchSimilarItems** - Find related content by vector similarity
+4. **analyzeImage** - Context-aware image analysis
+5. **projectDataAnalysis** - Fetch stored analysis without base64
+
+**External Tools (Feature-Flagged):**
+6. **searchWeb** - Perplexity AI web search with citations (when `PERPLEXITY_API_KEY` set)
+7. **sendEmail** - Send emails via Resend API (when `EMAIL_API_KEY` set)
+
+### Reference Tracking System
+
+**Bidirectional References:**
+- **Conversations → ProjectData**: Tracks which data items were used via `references` array
+- **ProjectData → Conversations**: Tracks where data was referenced via `referencedBy` array
+- **Automatic Extraction**: References extracted from tool results and saved with conversations
+- **Context Preservation**: Records the question context and tool that used each reference
+
+**API Endpoints:**
+- `/api/projects/data/[id]/references` - View all conversations that referenced a specific item
+- `/api/agent/analytics` - Analytics on tool usage, plan accuracy, and reference patterns
+
+### Step Execution Tracking
+
+Every tool call is tracked with detailed metadata:
+```typescript
+{
+  step: number,           // Sequential step number
+  tool: string,           // Tool name
+  input: object,          // Tool parameters
+  output: any,            // Tool result
+  duration: number,       // Execution time (ms)
+  tokens?: number,        // Token usage (if available)
+  timestamp: Date         // When executed
+}
+```
+
+**Benefits:**
+- **Debugging**: Trace exact agent behavior
+- **Performance Analysis**: Identify slow tools
+- **Cost Tracking**: Monitor token usage
+- **Pattern Recognition**: Learn effective strategies
+
+### Agent Analytics
+
+The `/api/agent/analytics` endpoint provides:
+- **Tool Usage**: Count, average duration, total duration per tool
+- **Step Budget Analysis**: Average, min, max steps per conversation
+- **Plan Accuracy**: Estimated vs. actual tool calls
+- **Reference Statistics**: Total references, breakdown by type (projectData/web/email)
+- **Top Referenced Items**: Most frequently used data items
+- **Insights**: Most/slowest tools, planning adoption rate, external data usage
+
+Query Parameters:
+- `projectId` - Filter by project
+- `sessionId` - Filter by session
+- `startDate` / `endDate` - Date range filtering
+
+### Agent System Prompt Enhancements
+
+The agent is now instructed to:
+1. **Always plan first** using planQuery tool
+2. **Show strategy** to users before executing
+3. **Monitor step budget** throughout execution
+4. **Adapt plans** if needed based on results
+5. **Reserve final step** for synthesis
+6. **Use external tools** only when explicitly needed or project data insufficient
+
 ## Performance Considerations
 
 - **Vector Search Pagination**: Implemented in `lib/utils.ts::doPaginatedVectorSearch()` to limit result sets
 - **Image Compression**: Reduces token usage by ~60-80% before LLM analysis
 - **Conversation Storage**: Base64 data is stripped before saving to `conversations` collection to avoid MongoDB document size limits (16MB)
 - **HMR Safety**: MongoDB client uses global caching in development to prevent connection pool exhaustion
+- **Reference Tracking**: Non-blocking - failures don't affect main conversation flow
+- **Tool Execution Tracking**: Minimal overhead (~1-2ms per tool call)

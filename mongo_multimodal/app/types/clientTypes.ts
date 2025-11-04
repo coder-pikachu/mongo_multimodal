@@ -48,3 +48,46 @@ export interface Message {
   content: string;
   createdAt: Date;
 }
+
+export interface AgentPlan {
+  steps: string[];
+  estimatedToolCalls: number;
+  rationale: string;
+  needsExternalData: boolean;
+  toolsToUse: string[];
+}
+
+export interface ToolExecution {
+  step: number;
+  tool: string;
+  input: Record<string, unknown>;
+  output: unknown;
+  duration: number;
+  tokens?: number;
+  timestamp: Date;
+}
+
+export interface ConversationReference {
+  type: 'projectData' | 'web' | 'email';
+  dataId?: string; // For projectData
+  url?: string; // For web
+  title: string;
+  usedInStep: number;
+  toolCall: string;
+  score?: number; // For search results
+}
+
+export interface ConversationMessage {
+  _id: string;
+  projectId: string;
+  sessionId: string;
+  message: {
+    role: 'user' | 'assistant';
+    content: string;
+  };
+  timestamp: Date;
+  contentCleaned?: boolean;
+  plan?: AgentPlan;
+  references?: ConversationReference[];
+  toolExecutions?: ToolExecution[];
+}

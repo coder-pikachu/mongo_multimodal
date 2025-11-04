@@ -4,6 +4,7 @@ import { ClientProjectData } from '@/types/clientTypes';
 import { Eye, Trash2, MessageSquare, BrainCircuit, Image as ImageIcon, X, Loader2, Wand2 } from 'lucide-react';
 import { useSearchResult } from './SearchResultContext';
 import ProcessButton from './ProcessButton';
+import { ImagePreviewModal } from './ImagePreviewModal';
 
 interface DataListProps {
   projectId: string;
@@ -22,9 +23,9 @@ const hasValidEmbedding = (item: ClientProjectData): boolean => {
          item.embedding.every(val => typeof val === 'number');
 };
 
-export default function DataList({ data, onSelectForChat, onSelectForAgent }: DataListProps) {
+export default function DataList({ projectId, data, onSelectForChat, onSelectForAgent }: DataListProps) {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [previewItem, setPreviewItem] = useState<ClientProjectData | null>(null);
+  const [previewDataId, setPreviewDataId] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState<string | null>(null);
   const [displayedItems, setDisplayedItems] = useState<ClientProjectData[]>([]);
   const [page, setPage] = useState(1);
@@ -85,22 +86,8 @@ export default function DataList({ data, onSelectForChat, onSelectForAgent }: Da
     console.log('Delete items:', selectedItems);
   };
 
-  const handlePreview = async (item: ClientProjectData) => {
-    if (item.type === 'image' && !item.content.base64) {
-      setLoadingImage(item._id);
-      try {
-        const response = await fetch(`/api/projects/data/${item._id}/content`);
-        if (response.ok) {
-          const data = await response.json();
-          item.content.base64 = data.content.base64;
-        }
-    } catch (error) {
-        console.error('Error loading image:', error);
-    } finally {
-        setLoadingImage(null);
-      }
-    }
-    setPreviewItem(item);
+  const handlePreview = (item: ClientProjectData) => {
+    setPreviewDataId(item._id);
   };
 
   const handleSelectForChat = (item: ClientProjectData) => {
@@ -265,11 +252,21 @@ export default function DataList({ data, onSelectForChat, onSelectForAgent }: Da
         </div>
       )}
 
-      {/* Enhanced Preview Modal */}
-      {previewItem && (
+      {/* Preview Modal */}
+      {previewDataId && (
+        <ImagePreviewModal
+          dataId={previewDataId}
+          projectId={projectId}
+          onClose={() => setPreviewDataId(null)}
+          allItems={displayedItems}
+        />
+      )}
+
+      {/* OLD MODAL TO REMOVE - KEEPING TEMPORARILY */}
+      {false && previewDataId && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={() => setPreviewItem(null)}
+          onClick={() => setPreviewDataId(null)}
         >
           <div
             className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl max-h-[90vh] w-full mx-4 overflow-hidden flex flex-col"
@@ -278,7 +275,7 @@ export default function DataList({ data, onSelectForChat, onSelectForAgent }: Da
             {/* Modal Header */}
             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
               <div>
-                <h3 className="font-bold text-lg">{previewItem.metadata.filename}</h3>
+                <h3 className="font-bold text-lg">Placeholder</h3>
                 <p className="text-sm text-gray-500">
                   {previewItem.type} • {(previewItem.metadata.size / 1024).toFixed(2)} KB
                 </p>

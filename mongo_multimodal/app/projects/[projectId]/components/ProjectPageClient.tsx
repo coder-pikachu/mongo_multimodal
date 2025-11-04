@@ -3,13 +3,14 @@
 import { ClientProject, ClientProjectData, SearchResult } from '@/types/clientTypes';
 import UploadButton from './UploadButton';
 import BatchProcessButton from './BatchProcessButton';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import SearchView from './SearchView';
 import ChatView from './ChatView';
-import AgentView from './AgentView';
 import DataExplorerView from './DataExplorerView';
 import { SearchResultProvider } from './SearchResultContext';
 import ProjectHeader from './ProjectHeader';
+import { AgentCentricLayout } from './AgentCentricLayout';
 
 interface ProjectPageClientProps {
   project: ClientProject;
@@ -17,7 +18,7 @@ interface ProjectPageClientProps {
   projectId: string;
 }
 
-type Mode = 'search' | 'chat' | 'agent' | 'explorer';
+type Mode = 'agent' | 'chat' | 'search' | 'explorer';
 
 interface PaginatedResults {
   results: SearchResult[];
@@ -28,12 +29,51 @@ interface PaginatedResults {
   timeTaken: number;
 }
 
-export default function ProjectPageClient({ project, data, projectId }: ProjectPageClientProps) {
-  const [mode, setMode] = useState<Mode>('search');
+export default function ProjectPageClient({ project, data: initialData, projectId }: ProjectPageClientProps) {
+  const searchParams = useSearchParams();
+  const legacyMode = searchParams.get('mode') as Mode | null;
+
+  // State for legacy modes (chat, search, explorer)
+  const [mode, setMode] = useState<Mode>(legacyMode || 'agent');
   const [searchResults, setSearchResults] = useState<PaginatedResults | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [projectData, setProjectData] = useState<ClientProjectData[]>(initialData);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const renderContent = () => {
+  // Update mode when URL changes
+  useEffect(() => {
+    if (legacyMode && ['chat', 'search', 'explorer'].includes(legacyMode)) {
+      setMode(legacyMode);
+    } else {
+      setMode('agent');
+    }
+  }, [legacyMode]);
+
+  // Refresh project data
+  const refreshProjectData = async () => {
+    setIsRefreshing(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/data`, {
+        cache: 'no-store'
+      });
+      if (response.ok) {
+        const freshData = await response.json();
+        setProjectData(freshData);
+      }
+    } catch (error) {
+      console.error('Error refreshing project data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // If agent mode (default), use new layout
+  if (mode === 'agent') {
+    return <AgentCentricLayout project={project} projectData={projectData} onDataUpdate={refreshProjectData} />;
+  }
+
+  // Legacy tab-based layout for chat/search/explorer modes
+  const renderLegacyContent = () => {
     switch (mode) {
       case 'search':
         return (
@@ -49,13 +89,11 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
         );
       case 'chat':
         return <ChatView projectId={projectId} />;
-      case 'agent':
-        return <AgentView projectId={projectId} />;
       case 'explorer':
         return (
           <DataExplorerView
             projectId={projectId}
-            data={data}
+            data={projectData}
             onSelectForChat={() => setMode('chat')}
             onSelectForAgent={() => setMode('agent')}
           />
@@ -75,7 +113,7 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
             rightActions={
               <div className="flex items-center gap-1">
                 <UploadButton projectId={projectId} asIcon />
-                <BatchProcessButton unprocessedItems={data} asIcon projectId={projectId} />
+                <BatchProcessButton unprocessedItems={projectData} asIcon />
               </div>
             }
           />
@@ -83,13 +121,23 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
           {/* Item Count Row */}
           <div className="flex justify-end items-center mt-2 mb-2">
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              {data.length} {data.length === 1 ? 'item' : 'items'} in this project
+              {projectData.length} {projectData.length === 1 ? 'item' : 'items'} in this project
             </div>
           </div>
 
-          {/* Tab Navigation */}
+          {/* Tab Navigation - Legacy modes only */}
           <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              <button
+                onClick={() => setMode('agent')}
+                className={`${
+                  mode === 'agent'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Agent (New)
+              </button>
               <button
                 onClick={() => setMode('search')}
                 className={`${
@@ -98,7 +146,7 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
               >
-                Search
+                Search (Legacy)
               </button>
               <button
                 onClick={() => setMode('chat')}
@@ -108,17 +156,7 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
               >
-                Chat
-              </button>
-              <button
-                onClick={() => setMode('agent')}
-                className={`${
-                  mode === 'agent'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-              >
-                Agent
+                Chat (Legacy)
               </button>
               <button
                 onClick={() => setMode('explorer')}
@@ -128,15 +166,15 @@ export default function ProjectPageClient({ project, data, projectId }: ProjectP
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
               >
-                Data Explorer
+                Data Explorer (Legacy)
               </button>
             </nav>
           </div>
 
           {/* Tab Content */}
           <div className="flex-grow overflow-y-auto pt-6">
-              {renderContent()}
-        </div>
+            {renderLegacyContent()}
+          </div>
         </div>
       </div>
     </SearchResultProvider>

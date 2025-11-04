@@ -4,6 +4,10 @@ import { streamText, tool, stepCountIs } from 'ai';
 import { getDb } from '@/lib/mongodb';
 import { doPaginatedVectorSearch } from '@/lib/utils';
 import { compressImage, estimateImageTokens } from '@/lib/image-utils';
+import { searchWeb, isPerplexityEnabled } from '@/lib/services/perplexity.service';
+import { sendEmail, isEmailEnabled, createEmailConfirmationPrompt } from '@/lib/services/email.service';
+import { extractReferencesFromToolResults, updateConversationWithReferences } from '@/lib/services/references.service';
+import { AgentPlan, ToolExecution } from '@/types/models';
 import { z } from 'zod';
 import { ObjectId } from 'mongodb';
 
@@ -192,8 +196,78 @@ async function getProjectDataAnalysis(projectId: string, dataId: string) {
   }
 }
 
-// Save conversation to MongoDB
-async function saveConversation(projectId: string, sessionId: string, message: { role: string, content: string }) {
+// Tool: Search similar items based on a specific dataId
+async function searchSimilarItems(projectId: string, dataId: string, maxResults: number = 3) {
+  try {
+    const db = await getDb();
+
+    // Get the item's embedding
+    const item = await db.collection('projectData').findOne(
+      { _id: new ObjectId(dataId) },
+      { projection: { embedding: 1, metadata: 1 } }
+    );
+
+    if (!item || !item.embedding) {
+      return JSON.stringify({ error: 'Item not found or has no embedding' });
+    }
+
+    // Search using the item's embedding
+    const results = await db.collection('projectData')
+      .aggregate([
+        {
+          $vectorSearch: {
+            queryVector: item.embedding,
+            path: 'embedding',
+            numCandidates: maxResults * 5,
+            limit: maxResults + 1, // +1 to exclude the original item
+            index: 'vector_index',
+            filter: projectId ? { projectId: new ObjectId(projectId) } : undefined
+          }
+        },
+        {
+          $match: {
+            _id: { $ne: new ObjectId(dataId) } // Exclude the original item
+          }
+        },
+        {
+          $project: {
+            _id: 1,
+            type: 1,
+            metadata: 1,
+            analysis: 1,
+            score: { $meta: 'vectorSearchScore' }
+          }
+        }
+      ])
+      .toArray();
+
+    const summaryResults = results.map((r) => ({
+      id: r._id.toString(),
+      filename: r.metadata?.filename || 'Unknown',
+      type: r.type,
+      score: r.score,
+      description: r.analysis?.description || 'No description available',
+      tags: r.analysis?.tags || []
+    }));
+
+    return JSON.stringify({
+      originalItem: item.metadata?.filename || dataId,
+      similarItems: summaryResults
+    });
+  } catch (error) {
+    console.error('Search similar items error:', error);
+    return JSON.stringify({ error: 'Failed to find similar items' });
+  }
+}
+
+// Save conversation to MongoDB with plan and references
+async function saveConversation(
+  projectId: string,
+  sessionId: string,
+  message: { role: string; content: string },
+  plan?: AgentPlan,
+  toolExecutions?: ToolExecution[]
+) {
   try {
     const db = await getDb();
     console.log('Agent: saveConversation - got DB connection');
@@ -222,24 +296,56 @@ async function saveConversation(projectId: string, sessionId: string, message: {
       }
     }
 
-    await db.collection('conversations').insertOne({
+    const doc: any = {
       projectId,
       sessionId,
       message: cleanMessage,
       timestamp: new Date(),
-      // Add a flag if content was cleaned
       contentCleaned: cleanMessage.content !== message.content
-    });
+    };
 
-    console.log('Agent: saveConversation - saved message');
+    // Add plan if provided
+    if (plan) {
+      doc.plan = plan;
+    }
+
+    // Add tool executions if provided
+    if (toolExecutions && toolExecutions.length > 0) {
+      doc.toolExecutions = toolExecutions;
+
+      // Extract and add references
+      const references = extractReferencesFromToolResults(toolExecutions, projectId);
+      if (references.length > 0) {
+        doc.references = references;
+      }
+    }
+
+    const result = await db.collection('conversations').insertOne(doc);
+
+    console.log('Agent: saveConversation - saved message with ID:', result.insertedId);
+
+    // If there are references and this is an assistant message, update project data
+    if (doc.references && message.role === 'assistant') {
+      const userQuery = cleanMessage.content.substring(0, 200); // First 200 chars as context
+      await updateConversationWithReferences(
+        db,
+        result.insertedId.toString(),
+        doc.references,
+        sessionId,
+        userQuery
+      );
+    }
+
+    return result.insertedId;
   } catch (error) {
     console.error('Agent: Error saving conversation:', error);
+    return null;
   }
 }
 
 export async function POST(req: Request) {
   try {
-    const { messages, projectId, sessionId = `session_${Date.now()}`, analysisDepth = 'general' } = await req.json();
+    const { messages, projectId, sessionId = `session_${Date.now()}`, analysisDepth = 'general', selectedDataIds } = await req.json();
 
     if (!projectId) {
       return new Response("Project ID is required", { status: 400 });
@@ -264,6 +370,7 @@ export async function POST(req: Request) {
     console.log('Agent: Starting streamText with tools');
     console.log('Agent: User query:', userQuery);
     console.log('Agent: Analysis depth:', analysisDepth);
+    console.log('Agent: Selected data IDs:', selectedDataIds);
 
     // Get project information for context
     const db = await getDb();
@@ -277,6 +384,11 @@ export async function POST(req: Request) {
     };
     const selectedProvider = (process.env.LLM_FOR_ANALYSIS as 'claude' | 'openai') || 'claude';
 
+    // Track tool executions and plan
+    let currentPlan: AgentPlan | undefined;
+    const toolExecutions: ToolExecution[] = [];
+    let stepCounter = 0;
+
     const result = await streamText({
       model: selectedProvider === 'claude' ? anthropic('claude-haiku-4-5-20251001') : openai('gpt-5-nano-2025-08-07'),
       maxOutputTokens: 8192,
@@ -288,24 +400,65 @@ ${project ? `**Project**: ${project.name}
 
 You are working within this specific project context. All searches and analyses must align to the project description.` : 'You are working with a multimodal data project stored in MongoDB.'}
 
-## Your Capabilities
-You have access to three powerful research tools:
+${selectedDataIds && selectedDataIds.length > 0 ? `## 🎯 User-Selected Items (PRIORITY CONTEXT)
+**The user has pre-selected ${selectedDataIds.length} item(s) for analysis:**
+${selectedDataIds.map((id: string, idx: number) => `${idx + 1}. Data ID: ${id}`).join('\n')}
 
-### 1. 🔍 searchProjectData
+**IMPORTANT**: These IDs are ready for immediate use with the \`analyzeImage\` tool. You can directly call:
+- \`analyzeImage(dataId: "${selectedDataIds[0]}", ...)\` to analyze the first selected item
+${selectedDataIds.length > 1 ? `- \`analyzeImage(dataId: "${selectedDataIds[1]}", ...)\` to analyze the second selected item` : ''}
+${selectedDataIds.length > 2 ? `- And so on for the other selected items` : ''}
+
+**DO NOT search for these items by filename** - use the provided data IDs directly! This saves tool calls and ensures accuracy.` : ''}
+
+## Your Capabilities
+You have access to ${isPerplexityEnabled() && isEmailEnabled() ? 'seven' : isPerplexityEnabled() || isEmailEnabled() ? 'six' : 'five'} powerful tools:
+
+### Core Research Tools
+
+### 1. 📋 planQuery (USE THIS FIRST!)
+- **MANDATORY FIRST STEP**: Create a plan BEFORE using any other tools
+- Decompose the user query into logical steps
+- Estimate tool calls needed and verify step budget
+- Identify which tools to use and in what order
+- Note if external data (web search) is needed
+- **You MUST call this tool first to show your strategy to the user**
+
+### 2. 🔍 searchProjectData
 - Search through project documents and images using semantic vector search
 - Returns relevant content with similarity scores
+- Accepts maxResults parameter (default: 2, max: 10)
 - Use for finding information related to user queries
 
-### 2. 🖼️ analyzeImage
+### 3. 🔗 searchSimilarItems
+- Find items similar to a specific data item by ID
+- Uses vector similarity to discover related content
+- Useful for exploring connections and related materials
+
+### 4. 🖼️ analyzeImage
 - Extract key insights and data from individual images with full context awareness
 - Uses project context and user query to focus analysis on relevant elements
 - Automatically compresses images for optimal processing
 - Can analyze up to ${maxAnalyses} images per query (${analysisDepth} analysis mode)
 - Provides targeted analysis based on what the user is specifically asking about
 
-### 3. 📄 projectDataAnalysis
+### 5. 📄 projectDataAnalysis
 - Fetch the stored analysis for a specific project item by id
 - Returns description, tags, insights, facets, and metadata (no base64) for precise reasoning
+
+${isPerplexityEnabled() ? `### External Tools
+
+### 6. 🌐 searchWeb
+- Search the web using Perplexity AI for external information
+- Returns answers with citations from reliable sources
+- Use when project data doesn't contain the needed information
+- Limited to 3 searches per conversation
+- **ONLY use when user explicitly asks for external/web information OR project data is insufficient**` : ''}
+
+${isEmailEnabled() ? `### 7. 📧 sendEmail
+- Send emails with analysis results or summaries
+- Requires explicit user confirmation before sending
+- Use when user requests to share or send information via email` : ''}
 
 ## CRITICAL: Data Source Constraints
 **YOU MUST ONLY USE INFORMATION FROM THE PROJECT DATA VIA YOUR TOOLS.**
@@ -350,14 +503,20 @@ After your analysis, include a "**## Sources Referenced**" section listing all f
 - Your FINAL step MUST be a comprehensive text response synthesizing all findings
 - **CRITICAL**: If you use all steps on tools, you CANNOT provide an answer!
 
-**Planning Phase (Do This BEFORE Any Tool Calls):**
-1. **Analyze the question**: What specific information is needed?
-2. **Plan your tools**: Which tools will give you the answer most efficiently?
-3. **Count your steps**: How many tool calls do you need? Do you have enough steps?
-4. **Prioritize**: What's the minimum information needed for a good answer?
+**Planning Phase (MANDATORY FIRST STEP):**
+1. **Call planQuery tool FIRST** - This creates a visible plan for the user showing:
+   - Decomposition of the query into logical steps
+   - Which tools you'll use and in what order
+   - Estimated number of tool calls needed
+   - Whether external data sources are required
+   - Rationale for your approach
+2. **After planning**, execute the plan step by step
+3. **Monitor progress**: Track your steps and adjust if needed
+4. **Reserve final step**: Always keep your last step for synthesis
 
 **Execution Strategy:**
-- ${analysisDepth === 'deep' ? '**Deep Mode**: Aim for 2-3 searches + 3-4 image analyses, always leaving step 8 for synthesis' : '**General Mode**: Aim for 1-2 searches + 1-2 image analyses, always leaving step 5-7 for synthesis'}
+- ${analysisDepth === 'deep' ? '**Deep Mode**: Use planQuery (step 1) + 10 tool steps + synthesis (step 12). Aim for 2-3 searches + 3-4 analyses' : '**General Mode**: Use planQuery (step 1) + 5 tool steps + synthesis (step 7). Aim for 1-2 searches + 1-2 analyses'}
+- Follow your plan but adapt if results require different approach
 - Start with broad searches, then narrow down if needed
 - If running low on steps, synthesize what you have rather than making more tool calls
 - **Better to answer well with limited data than to gather data without answering**
@@ -365,18 +524,19 @@ After your analysis, include a "**## Sources Referenced**" section listing all f
 ## Research Methodology
 Choose your strategy based on query complexity. Start with 1-2 single-word probes (e.g., key ingredient names) rather than long phrases, then iterate:
 
-- **Simple queries (low fidelity needed)**: Make a small number of targeted tool calls (1-3). Prefer concise searches and return the answer directly.
-- **Complex queries (richer reasoning)**: Plan iteratively. Make multiple focused tool calls with narrower sub-queries. Synthesize only at the end.
+- **Simple queries (low fidelity needed)**: Create a simple 2-3 step plan, make targeted tool calls (1-3), return answer.
+- **Complex queries (richer reasoning)**: Create detailed plan with 4-6 steps, make multiple focused tool calls with narrower sub-queries, synthesize at end.
 
 General approach:
-1. **PLAN FIRST**: Before any tool calls, mentally plan which tools you'll use and verify you have enough steps
-2. **ALWAYS** start by using tools to search the project data - never answer without calling tools first
+1. **PLAN FIRST (MANDATORY)**: Call planQuery tool to create and share your strategy with the user
+2. **Execute plan**: Follow the steps you outlined in your plan
 3. If the user mentions specific items/IDs, target those first
-4. Decompose ambiguous queries into concrete sub-queries, but **be mindful of step budget**
+4. Decompose ambiguous queries into concrete sub-queries (as shown in your plan)
 5. Prefer focused searches that answer the question directly over exhaustive exploration
-6. Keep each tool call scoped; for project search, return only top 1-2 items per call
+6. Keep each tool call scoped; for project search, default to 2 results (adjust maxResults if needed)
 7. **If tools return no results**, try 1-2 alternative search terms, then conclude if step budget is tight
 8. **Monitor your step usage**: After each tool call, consider if you should gather more data or synthesize now
+9. **Adapt if needed**: If your plan isn't working, it's okay to adjust - just note the change in your synthesis
 
 ## Response Format
 Keep responses concise, solution-focused, and beautifully formatted in Markdown:
@@ -418,28 +578,122 @@ Never end your response immediately after tool calls. Always synthesize and pres
       // Deep: 7 tool calls + 1 synthesis = 8 steps
       stopWhen: stepCountIs(analysisDepth === 'deep' ? 12 : 7),
       tools: {
+        planQuery: tool({
+          description: 'Create a detailed plan for answering the user query. MUST be called first before any other tools.',
+          inputSchema: z.object({
+            steps: z.array(z.string()).describe('List of logical steps to answer the query'),
+            toolsToUse: z.array(z.string()).describe('Tools you plan to use (e.g., ["searchProjectData", "analyzeImage"])'),
+            estimatedToolCalls: z.number().describe('Estimated number of tool calls needed'),
+            rationale: z.string().describe('Brief explanation of your approach'),
+            needsExternalData: z.boolean().describe('Whether web search or external data is needed')
+          }),
+          execute: async ({ steps, toolsToUse, estimatedToolCalls, rationale, needsExternalData }) => {
+            stepCounter++;
+            const startTime = Date.now();
+
+            console.log('Tool call: planQuery');
+            console.log('Steps:', steps);
+            console.log('Tools to use:', toolsToUse);
+            console.log('Estimated calls:', estimatedToolCalls);
+
+            const plan: AgentPlan = {
+              steps,
+              toolsToUse,
+              estimatedToolCalls,
+              rationale,
+              needsExternalData
+            };
+
+            currentPlan = plan;
+
+            // Record this tool execution
+            toolExecutions.push({
+              step: stepCounter,
+              tool: 'planQuery',
+              input: { steps, toolsToUse, estimatedToolCalls, rationale, needsExternalData },
+              output: plan,
+              duration: Date.now() - startTime,
+              timestamp: new Date()
+            });
+
+            return JSON.stringify({
+              success: true,
+              plan,
+              message: `Plan created with ${steps.length} steps. Estimated ${estimatedToolCalls} tool calls. ${needsExternalData ? 'External data will be needed.' : 'Will use project data only.'}`
+            });
+          },
+        }),
         searchProjectData: tool({
-          description: 'Search for information within the current project documents and images',
+          description: 'Search for information within the current project documents and images. Returns top results with similarity scores.',
           inputSchema: z.object({
             query: z.string().describe('The search query'),
+            maxResults: z.number().optional().describe('Maximum number of results to return (default: 2, max: 10)'),
             useAnalysis: z.boolean().optional().describe('If true, prioritize items with analysis.description and consider tags when summarizing')
           }),
-          execute: async ({ query, useAnalysis }) => {
-            console.log('Tool call: searchProjectData with query:', query, 'useAnalysis:', useAnalysis);
+          execute: async ({ query, maxResults = 2, useAnalysis }) => {
+            stepCounter++;
+            const startTime = Date.now();
+
+            console.log('Tool call: searchProjectData with query:', query, 'maxResults:', maxResults, 'useAnalysis:', useAnalysis);
+
+            // Clamp maxResults to reasonable limits
+            const limit = Math.min(Math.max(maxResults, 1), 10);
+
             const raw = await searchProjectData(projectId, query);
-            if (!useAnalysis) return raw;
-            try {
-              const parsed: { results?: Array<{ description?: string }> } = JSON.parse(raw as unknown as string);
-              // Move analyzed items to the top
-              parsed.results = (parsed.results || []).sort((a, b) => {
-                const aHas = !!a.description && a.description !== 'No description available';
-                const bHas = !!b.description && b.description !== 'No description available';
-                return Number(bHas) - Number(aHas);
-              });
-              return JSON.stringify(parsed);
-            } catch {
-              return raw;
+
+            let result = raw;
+            if (useAnalysis) {
+              try {
+                const parsed: { results?: Array<{ description?: string }> } = JSON.parse(raw as unknown as string);
+                // Move analyzed items to the top
+                parsed.results = (parsed.results || []).sort((a, b) => {
+                  const aHas = !!a.description && a.description !== 'No description available';
+                  const bHas = !!b.description && b.description !== 'No description available';
+                  return Number(bHas) - Number(aHas);
+                });
+                result = JSON.stringify(parsed);
+              } catch {
+                result = raw;
+              }
             }
+
+            toolExecutions.push({
+              step: stepCounter,
+              tool: 'searchProjectData',
+              input: { query, maxResults: limit, useAnalysis },
+              output: result,
+              duration: Date.now() - startTime,
+              timestamp: new Date()
+            });
+
+            return result;
+          },
+        }),
+        searchSimilarItems: tool({
+          description: 'Find items similar to a specific data item using vector similarity. Useful for exploring related content.',
+          inputSchema: z.object({
+            dataId: z.string().describe('The ID of the item to find similar items for'),
+            maxResults: z.number().optional().describe('Maximum number of similar items to return (default: 3, max: 10)')
+          }),
+          execute: async ({ dataId, maxResults = 3 }) => {
+            stepCounter++;
+            const startTime = Date.now();
+
+            console.log('Tool call: searchSimilarItems with dataId:', dataId, 'maxResults:', maxResults);
+
+            const limit = Math.min(Math.max(maxResults, 1), 10);
+            const result = await searchSimilarItems(projectId, dataId, limit);
+
+            toolExecutions.push({
+              step: stepCounter,
+              tool: 'searchSimilarItems',
+              input: { dataId, maxResults: limit },
+              output: result,
+              duration: Date.now() - startTime,
+              timestamp: new Date()
+            });
+
+            return result;
           },
         }),
         analyzeImage: tool({
@@ -448,8 +702,23 @@ Never end your response immediately after tool calls. Always synthesize and pres
             dataId: z.string().describe('The ID of the image to analyze'),
           }),
           execute: async ({ dataId }) => {
+            stepCounter++;
+            const startTime = Date.now();
+
             console.log('Tool call: analyzeImage with dataId:', dataId);
-            return await analyzeImage(projectId, dataId, userQuery, projectContext);
+
+            const result = await analyzeImage(projectId, dataId, userQuery, projectContext);
+
+            toolExecutions.push({
+              step: stepCounter,
+              tool: 'analyzeImage',
+              input: { dataId },
+              output: result,
+              duration: Date.now() - startTime,
+              timestamp: new Date()
+            });
+
+            return result;
           },
         }),
         projectDataAnalysis: tool({
@@ -458,19 +727,148 @@ Never end your response immediately after tool calls. Always synthesize and pres
             dataId: z.string().describe('The ID of the projectData item'),
           }),
           execute: async ({ dataId }) => {
+            stepCounter++;
+            const startTime = Date.now();
+
             console.log('Tool call: projectDataAnalysis with dataId:', dataId);
-            return await getProjectDataAnalysis(projectId, dataId);
+
+            const result = await getProjectDataAnalysis(projectId, dataId);
+
+            toolExecutions.push({
+              step: stepCounter,
+              tool: 'projectDataAnalysis',
+              input: { dataId },
+              output: result,
+              duration: Date.now() - startTime,
+              timestamp: new Date()
+            });
+
+            return result;
           },
         }),
+        ...(isPerplexityEnabled() ? {
+          searchWeb: tool({
+            description: 'Search the web using Perplexity AI for external information. Returns answers with citations. Use only when project data is insufficient or user explicitly requests external info.',
+            inputSchema: z.object({
+              query: z.string().describe('The web search query'),
+            }),
+            execute: async ({ query }) => {
+              stepCounter++;
+              const startTime = Date.now();
+
+              console.log('Tool call: searchWeb with query:', query);
+
+              try {
+                const webResult = await searchWeb(query);
+
+                const result = JSON.stringify({
+                  answer: webResult.answer,
+                  citations: webResult.citations,
+                  source: 'web'
+                });
+
+                toolExecutions.push({
+                  step: stepCounter,
+                  tool: 'searchWeb',
+                  input: { query },
+                  output: result,
+                  duration: Date.now() - startTime,
+                  timestamp: new Date()
+                });
+
+                return result;
+              } catch (error) {
+                const errorResult = JSON.stringify({
+                  error: error instanceof Error ? error.message : 'Web search failed'
+                });
+
+                toolExecutions.push({
+                  step: stepCounter,
+                  tool: 'searchWeb',
+                  input: { query },
+                  output: errorResult,
+                  duration: Date.now() - startTime,
+                  timestamp: new Date()
+                });
+
+                return errorResult;
+              }
+            },
+          })
+        } : {}),
+        ...(isEmailEnabled() ? {
+          sendEmail: tool({
+            description: 'Send an email with analysis results or summaries. Use when user requests to share or send information via email. Note: Email sending requires explicit confirmation.',
+            inputSchema: z.object({
+              to: z.string().describe('Email address to send to'),
+              subject: z.string().describe('Email subject'),
+              body: z.string().describe('Email body content (markdown supported)'),
+            }),
+            execute: async ({ to, subject, body }) => {
+              stepCounter++;
+              const startTime = Date.now();
+
+              console.log('Tool call: sendEmail to:', to);
+
+              try {
+                const emailResult = await sendEmail({ to, subject, body });
+
+                const result = JSON.stringify({
+                  success: emailResult.success,
+                  messageId: emailResult.messageId,
+                  error: emailResult.error,
+                  note: emailResult.success
+                    ? 'Email sent successfully'
+                    : 'Email sending failed - user confirmation may be needed'
+                });
+
+                toolExecutions.push({
+                  step: stepCounter,
+                  tool: 'sendEmail',
+                  input: { to, subject, body: body.substring(0, 200) + '...' }, // Truncate body in log
+                  output: result,
+                  duration: Date.now() - startTime,
+                  timestamp: new Date()
+                });
+
+                return result;
+              } catch (error) {
+                const errorResult = JSON.stringify({
+                  success: false,
+                  error: error instanceof Error ? error.message : 'Email sending failed'
+                });
+
+                toolExecutions.push({
+                  step: stepCounter,
+                  tool: 'sendEmail',
+                  input: { to, subject },
+                  output: errorResult,
+                  duration: Date.now() - startTime,
+                  timestamp: new Date()
+                });
+
+                return errorResult;
+              }
+            },
+          })
+        } : {}),
       },
       onFinish: async ({ text }) => {
         console.log('Agent: onFinish called with text length:', text?.length || 0);
         console.log('Agent: Final text preview:', text?.substring(0, 200));
-        // Save the assistant's response
-        await saveConversation(projectId, sessionId, {
-          role: 'assistant',
-          content: text,
-        });
+        console.log('Agent: Total tool executions:', toolExecutions.length);
+
+        // Save the assistant's response with plan and tool executions
+        await saveConversation(
+          projectId,
+          sessionId,
+          {
+            role: 'assistant',
+            content: text,
+          },
+          currentPlan,
+          toolExecutions
+        );
       },
     });
 

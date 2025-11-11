@@ -1,7 +1,7 @@
 
 'use client'
 import { useState, useEffect, useCallback } from 'react';
-import { Bot, User, Send, ChevronDown, ChevronRight, BrainCircuit, History, MessageSquare, Image as ImageIcon, Loader2, Search, Globe, Eye, ChevronUp, Copy, Check, Brain, Database, Mail, ClipboardList, Link } from 'lucide-react';
+import { Bot, User, Send, ChevronDown, ChevronRight, BrainCircuit, History, MessageSquare, Image as ImageIcon, Loader2, Search, Globe, Eye, ChevronUp, Copy, Check, Brain, Database, Mail, ClipboardList, Link, StopCircle } from 'lucide-react';
 import { useSelection } from './SelectionContext';
 import { Message, AgentPlan, ConversationReference } from '@/types/clientTypes';
 import ReactMarkdown from 'react-markdown';
@@ -51,6 +51,19 @@ export default function AgentView({ projectId }: AgentViewProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [toolCallsMetadata, setToolCallsMetadata] = useState<Map<string, ToolCallMetadata[]>>(new Map());
     const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(new Set());
+    const [abortController, setAbortController] = useState<AbortController | null>(null);
+
+    // Calculate available tools based on toggles
+    const availableTools = [
+        'planQuery',
+        'searchProjectData',
+        'searchSimilarItems',
+        'analyzeImage',
+        'projectDataAnalysis',
+        ...(enableMemory ? ['rememberContext', 'recallMemory'] : []),
+        ...(enableWebSearch ? ['searchWeb'] : []),
+        ...(enableEmail ? ['sendEmail'] : [])
+    ];
 
     // Plan and progress tracking
     const [currentPlan, setCurrentPlan] = useState<AgentPlan | null>(null);
@@ -137,6 +150,14 @@ export default function AgentView({ projectId }: AgentViewProps) {
         }
     };
 
+    const handleStop = () => {
+        if (abortController) {
+            abortController.abort();
+            setAbortController(null);
+            setIsLoading(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
@@ -151,6 +172,12 @@ export default function AgentView({ projectId }: AgentViewProps) {
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setIsLoading(true);
+
+        // Create new AbortController for this request
+        const controller = new AbortController();
+        setAbortController(controller);
+
+        let assistantMessage: Message | null = null;
 
         try {
             // Extract data IDs from selected items if available
@@ -174,21 +201,22 @@ export default function AgentView({ projectId }: AgentViewProps) {
                     enableWebSearch,
                     enableEmail,
                     enableMemory
-                })
+                }),
+                signal: controller.signal
             });
 
             if (!response.ok) throw new Error('Failed to send message');
 
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
-            const assistantMessage: Message = {
+            assistantMessage = {
                 id: `msg_${Date.now()}_assistant`,
                 role: 'assistant',
                 content: '',
                 createdAt: new Date()
             };
 
-            setMessages(prev => [...prev, assistantMessage]);
+            setMessages(prev => [...prev, assistantMessage!]);
 
             if (reader) {
                 let buffer = '';
@@ -381,12 +409,24 @@ export default function AgentView({ projectId }: AgentViewProps) {
                     }
                 }
             }
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (error: unknown) {
+            if (error instanceof Error && error.name === 'AbortError') {
+                console.log('Agent execution stopped by user');
+                // Add a system message indicating the stop
+                setMessages(prev => [...prev, {
+                    id: `msg_${Date.now()}_stopped`,
+                    role: 'assistant',
+                    content: '_Agent execution stopped by user._',
+                    createdAt: new Date()
+                }]);
+            } else {
+                console.error('Error:', error);
+            }
         } finally {
             setIsLoading(false);
+            setAbortController(null);
             // Save completed plan for this message before resetting
-            if (currentPlan && assistantMessage.id) {
+            if (currentPlan && assistantMessage) {
                 setCompletedPlans(prev => {
                     const newMap = new Map(prev);
                     newMap.set(assistantMessage.id, currentPlan);
@@ -474,7 +514,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                     <div
                         className={`relative group px-4 py-2 rounded-lg ${
                             m.role === 'user'
-                                ? 'bg-blue-500 text-white'
+                                ? 'bg-[#13AA52] text-white'
                                 : 'bg-white dark:bg-gray-900 border dark:border-gray-800'
                         }`}
                     >
@@ -624,7 +664,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                         return newSet;
                                     });
                                 }}
-                                className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 px-3 py-1 bg-blue-50 dark:bg-gray-900 rounded"
+                                className="flex items-center gap-2 text-xs text-[#13AA52] dark:text-[#00ED64] hover:text-[#00684A] dark:hover:text-[#13AA52] px-3 py-1 bg-green-50 dark:bg-gray-900 rounded"
                             >
                                 {showPlan ? (
                                     <ChevronUp className="h-3 w-3" />
@@ -635,11 +675,11 @@ export default function AgentView({ projectId }: AgentViewProps) {
                             </button>
 
                             {showPlan && (
-                                <div className="mt-2 p-3 bg-blue-50 dark:bg-gray-900 rounded border border-blue-200 dark:border-gray-800">
-                                    <h4 className="text-xs font-semibold text-blue-900 dark:text-blue-400 mb-2">Agent Planning</h4>
+                                <div className="mt-2 p-3 bg-green-50 dark:bg-gray-900 rounded border border-green-200 dark:border-gray-800">
+                                    <h4 className="text-xs font-semibold text-[#00684A] dark:text-[#00ED64] mb-2">Agent Planning</h4>
                                     <div className="text-xs space-y-2">
                                         <div>
-                                            <span className="font-medium text-blue-800 dark:text-blue-200">Steps:</span>
+                                            <span className="font-medium text-[#13AA52] dark:text-[#00ED64]">Steps:</span>
                                             <ol className="list-decimal list-inside mt-1 space-y-1 text-gray-700 dark:text-gray-300">
                                                 {messagePlan.steps.map((step, idx) => (
                                                     <li key={idx}>{step}</li>
@@ -648,13 +688,13 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                         </div>
                                         {messagePlan.toolsToUse && messagePlan.toolsToUse.length > 0 && (
                                             <div>
-                                                <span className="font-medium text-blue-800 dark:text-blue-200">Tools planned:</span>
+                                                <span className="font-medium text-[#13AA52] dark:text-[#00ED64]">Tools planned:</span>
                                                 <span className="ml-2 text-gray-700 dark:text-gray-300">{messagePlan.toolsToUse.join(', ')}</span>
                                             </div>
                                         )}
                                         {messagePlan.estimatedToolCalls && (
                                             <div>
-                                                <span className="font-medium text-blue-800 dark:text-blue-200">Estimated tool calls:</span>
+                                                <span className="font-medium text-[#13AA52] dark:text-[#00ED64]">Estimated tool calls:</span>
                                                 <span className="ml-2 text-gray-700 dark:text-gray-300">{messagePlan.estimatedToolCalls}</span>
                                             </div>
                                         )}
@@ -705,13 +745,13 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                                 ) : toolCall.toolName === 'projectDataAnalysis' ? (
                                                     <BrainCircuit className="h-3 w-3" />
                                                 ) : toolCall.toolName === 'rememberContext' ? (
-                                                    <Brain className="h-3 w-3 text-purple-500" />
+                                                    <Brain className="h-3 w-3 text-[#13AA52]" />
                                                 ) : toolCall.toolName === 'recallMemory' ? (
-                                                    <Database className="h-3 w-3 text-purple-500" />
+                                                    <Database className="h-3 w-3 text-[#13AA52]" />
                                                 ) : toolCall.toolName === 'searchWeb' ? (
-                                                    <Globe className="h-3 w-3 text-blue-500" />
+                                                    <Globe className="h-3 w-3 text-[#00684A]" />
                                                 ) : toolCall.toolName === 'sendEmail' ? (
-                                                    <Mail className="h-3 w-3 text-green-500" />
+                                                    <Mail className="h-3 w-3 text-[#116149]" />
                                                 ) : (
                                                     <MessageSquare className="h-3 w-3" />
                                                 )}
@@ -740,7 +780,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                                                     if (output.results && Array.isArray(output.results)) {
                                                                         return (
                                                                             <div className="space-y-1">
-                                                                                <div className="font-semibold text-blue-600 dark:text-blue-400">
+                                                                                <div className="font-semibold text-[#13AA52] dark:text-[#00ED64]">
                                                                                     Found {output.total || output.results.length} results:
                                                                                 </div>
                                                                                 {output.results.slice(0, 3).map((r: { id?: string, filename?: string, metadata?: { filename?: string }, score: number }, i: number) => (
@@ -816,7 +856,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
         <div className="flex flex-col h-full dark:bg-black">
             <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
-                    <BrainCircuit className="h-6 w-6 text-blue-500" />
+                    <BrainCircuit className="h-6 w-6 text-[#00ED64]" />
                     <span className="font-semibold">Agent Mode</span>
                     {selectedItems.length > 0 && (
                         <span className="text-sm text-gray-500 flex items-center gap-1">
@@ -836,7 +876,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                     </button>
                     <button
                         onClick={startNewConversation}
-                        className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700"
+                        className="flex items-center gap-2 px-3 py-1 text-sm bg-[#00ED64] dark:bg-[#13AA52] text-gray-900 dark:text-white rounded-md hover:bg-[#13AA52] dark:hover:bg-[#00684A]"
                     >
                         <MessageSquare className="h-4 w-4" />
                         New Chat
@@ -885,6 +925,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         plan={currentPlan}
                         currentStep={currentStep}
                         totalSteps={currentPlan.estimatedToolCalls + 1}
+                        availableTools={availableTools}
                     />
                 </div>
             )}
@@ -908,9 +949,18 @@ export default function AgentView({ projectId }: AgentViewProps) {
                             <div className="bg-gray-200 dark:bg-gray-700 p-2 rounded-full">
                                 <Bot className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                             </div>
-                            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Thinking and researching...</span>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Thinking and researching...</span>
+                                </div>
+                                <button
+                                    onClick={handleStop}
+                                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:underline"
+                                    title="Stop agent execution"
+                                >
+                                    (click Stop to cancel)
+                                </button>
                             </div>
                         </div>
                     )}
@@ -962,7 +1012,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         onClick={() => setAnalysisDepth(analysisDepth === 'deep' ? 'general' : 'deep')}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                             analysisDepth === 'deep'
-                                ? 'bg-blue-500 text-white shadow-sm'
+                                ? 'bg-[#00ED64] text-gray-900 shadow-sm'
                                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                         title={analysisDepth === 'deep' ? 'Deep Analysis: 5 analyses' : 'General Analysis: 3 analyses'}
@@ -977,7 +1027,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         onClick={() => setEnableMemory(!enableMemory)}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                             enableMemory
-                                ? 'bg-purple-500 text-white shadow-sm'
+                                ? 'bg-[#13AA52] text-white shadow-sm'
                                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                         title={enableMemory ? 'Memory: ON - Agent remembers context' : 'Memory: OFF'}
@@ -992,7 +1042,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         onClick={() => setEnableWebSearch(!enableWebSearch)}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                             enableWebSearch
-                                ? 'bg-green-500 text-white shadow-sm'
+                                ? 'bg-[#00684A] text-white shadow-sm'
                                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                         title={enableWebSearch ? 'Web Search: ON - Can search external sources' : 'Web Search: OFF'}
@@ -1007,7 +1057,7 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         onClick={() => setEnableEmail(!enableEmail)}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                             enableEmail
-                                ? 'bg-orange-500 text-white shadow-sm'
+                                ? 'bg-[#116149] text-white shadow-sm'
                                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                         title={enableEmail ? 'Email: ON - Can send emails' : 'Email: OFF'}
@@ -1024,14 +1074,26 @@ export default function AgentView({ projectId }: AgentViewProps) {
                         className="flex-grow p-2 border rounded-md dark:bg-black dark:border-gray-800"
                         disabled={isLoading}
                     />
-                    <button
-                        type="submit"
-                        disabled={isLoading || !input.trim()}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md disabled:bg-gray-400 flex items-center gap-2"
-                    >
-                        <Send className="h-4 w-4" />
-                        {isLoading ? 'Researching...' : 'Send'}
-                    </button>
+                    {isLoading ? (
+                        <button
+                            type="button"
+                            onClick={handleStop}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md flex items-center gap-2 transition-colors"
+                            title="Stop agent execution"
+                        >
+                            <StopCircle className="h-4 w-4" />
+                            Stop
+                        </button>
+                    ) : (
+                        <button
+                            type="submit"
+                            disabled={!input.trim()}
+                            className="px-4 py-2 bg-[#00ED64] hover:bg-[#13AA52] text-gray-900 rounded-md disabled:bg-gray-400 disabled:text-gray-200 flex items-center gap-2"
+                        >
+                            <Send className="h-4 w-4" />
+                            Send
+                        </button>
+                    )}
                 </form>
             </div>
         </div>

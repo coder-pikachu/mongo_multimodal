@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Info, X, Pencil } from 'lucide-react';
 import { ClientProject } from '@/types/clientTypes';
 
@@ -14,25 +14,50 @@ export default function ProjectHeader({ project, rightActions }: ProjectHeaderPr
   const [isEditing, setIsEditing] = useState(false);
   const [desc, setDesc] = useState(project.description || '');
   const [saving, setSaving] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Handle click outside to close tooltip
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        tooltipRef.current &&
+        buttonRef.current &&
+        !tooltipRef.current.contains(event.target as Node) &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setShowTooltip(false);
+        setIsEditing(false);
+      }
+    };
+
+    if (showTooltip) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showTooltip]);
 
   return (
-    <div className="relative flex items-center justify-between mb-4">
+    <div className="relative flex items-center justify-between">
       <div className="flex items-center gap-2 min-w-0">
-        <h1 className="text-2xl md:text-3xl font-bold truncate" title={project.name}>{project.name}</h1>
-        <button
-          onClick={() => setShowTooltip(!showTooltip)}
-          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          aria-label="Show project description"
-        >
-          <Info className="h-5 w-5" />
-        </button>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {rightActions}
-      </div>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate" title={project.name}>{project.name}</h1>
+        <div className="relative">
+          <button
+            ref={buttonRef}
+            onClick={() => setShowTooltip(!showTooltip)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            aria-label="Show project description"
+          >
+            <Info className="h-5 w-5" />
+          </button>
 
-      {showTooltip && (
-        <div className="absolute top-full left-0 mt-2 z-50 w-full max-w-2xl">
+          {showTooltip && (
+            <div
+              ref={tooltipRef}
+              className="absolute top-full left-0 mt-2 z-50 w-screen max-w-2xl"
+            >
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex justify-between items-start gap-3">
               {isEditing ? (
@@ -95,8 +120,13 @@ export default function ProjectHeader({ project, rightActions }: ProjectHeaderPr
               </div>
             </div>
           </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {rightActions}
+      </div>
     </div>
   );
 }

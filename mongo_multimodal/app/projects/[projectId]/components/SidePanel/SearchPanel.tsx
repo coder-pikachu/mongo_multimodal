@@ -143,13 +143,13 @@ export function SearchPanel({ projectId }: SearchPanelProps) {
             }}
             placeholder="Search project data..."
             className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md
-                     focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                     focus:ring-2 focus:ring-[#00ED64] focus:border-[#00ED64]
                      bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           />
           <button
             onClick={() => handleSearch()}
             disabled={isLoading || !searchQuery.trim()}
-            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:bg-gray-400
+            className="px-3 py-2 bg-[#00ED64] hover:bg-[#13AA52] text-gray-900 rounded-md disabled:bg-gray-400
                      disabled:cursor-not-allowed transition-colors"
             aria-label="Search"
           >
@@ -202,7 +202,7 @@ export function SearchPanel({ projectId }: SearchPanelProps) {
             </span>
             <button
               onClick={allSelected ? handleDeselectAll : handleSelectAll}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-xs text-[#13AA52] dark:text-[#00ED64] hover:underline"
             >
               {allSelected ? 'Deselect all' : 'Select all'}
             </button>
@@ -224,7 +224,7 @@ export function SearchPanel({ projectId }: SearchPanelProps) {
                 className={`
                   p-3 border rounded-md transition-colors
                   ${selected
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                     : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
                   }
                 `}
@@ -233,7 +233,7 @@ export function SearchPanel({ projectId }: SearchPanelProps) {
                   {/* Checkbox */}
                   <div className="mt-0.5 flex-shrink-0 cursor-pointer" onClick={() => toggleItem(result)}>
                     {selected ? (
-                      <CheckSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <CheckSquare className="w-4 h-4 text-[#00ED64] dark:text-[#00ED64]" />
                     ) : (
                       <Square className="w-4 h-4 text-gray-400" />
                     )}
@@ -319,7 +319,7 @@ export function SearchPanel({ projectId }: SearchPanelProps) {
       {/* Loading More Indicator */}
       {isLoadingMore && (
         <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+          <Loader2 className="w-5 h-5 animate-spin text-[#00ED64]" />
           <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading more...</span>
         </div>
       )}

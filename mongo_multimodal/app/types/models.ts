@@ -20,22 +20,35 @@ export interface Project {
 export interface ProjectData {
   _id: ObjectId;
   projectId: ObjectId;
-  type: 'image' | 'document';
+  type: 'image' | 'document' | 'text_chunk' | 'web_chunk';
   content: {
     base64?: string; // for images
-    text?: string;   // for documents
+    text?: string;   // for documents and chunks
   };
   metadata: {
     filename: string;
     mimeType: string;
     size: number;
+    // Chunk metadata for text_chunk and web_chunk types
+    chunkInfo?: {
+      chunkIndex: number;
+      totalChunks: number;
+      parentId?: ObjectId; // links chunks from same source
+      sourceUrl?: string; // for web chunks
+      originalFilename?: string;
+      csvMetadata?: {
+        rowStart: number;
+        rowEnd: number;
+        columns: string[];
+      };
+    };
   };
   analysis: {
     description: string;
     tags: string[];
     insights: string[];
   };
-  embedding: number[]; // 1024-dimensional vector
+  embedding?: number[]; // 1024-dimensional vector
   referencedBy?: Reference[]; // Track where this data was used
   createdAt: Date;
   updatedAt: Date;

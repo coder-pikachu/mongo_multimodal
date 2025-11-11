@@ -93,7 +93,7 @@ export function ReferencesPanel({ references, onPreview }: ReferencesPanelProps)
                       className={`
                         p-2 border border-gray-200 dark:border-gray-700 rounded-md
                         bg-white dark:bg-gray-800 text-sm
-                        ${onPreview && ref.dataId ? 'cursor-pointer hover:border-blue-300 dark:hover:border-blue-600' : ''}
+                        ${onPreview && ref.dataId ? 'cursor-pointer hover:border-green-300 dark:hover:border-green-600' : ''}
                       `}
                       onClick={() => {
                         if (onPreview && ref.dataId) {
@@ -127,7 +127,7 @@ export function ReferencesPanel({ references, onPreview }: ReferencesPanelProps)
                               href={ref.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block mt-1"
+                              className="text-xs text-[#13AA52] dark:text-[#00ED64] hover:underline truncate block mt-1"
                               onClick={(e) => e.stopPropagation()}
                             >
                               {ref.url}

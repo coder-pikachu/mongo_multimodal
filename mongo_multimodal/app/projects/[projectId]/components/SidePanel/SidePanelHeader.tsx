@@ -30,7 +30,7 @@ export function SidePanelHeader({ currentMode, onModeChange }: SidePanelHeaderPr
               flex-1 px-4 py-3 flex items-center justify-center gap-2
               transition-colors text-sm font-medium
               ${isActive
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                ? 'text-[#00ED64] dark:text-[#00ED64] border-b-2 border-[#00ED64] dark:border-[#00ED64] bg-green-50 dark:bg-green-900/20'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
               }
             `}

@@ -29,7 +29,7 @@ export function StepProgressTracker({
         </div>
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
           <div
-            className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out relative"
+            className="bg-[#00ED64] h-2 rounded-full transition-all duration-500 ease-out relative"
             style={{ width: `${progressPercentage}%` }}
           >
             {/* Animated shimmer effect */}
@@ -58,7 +58,7 @@ export function StepProgressTracker({
                   )}
                   {isCurrent && (
                     <div className="relative">
-                      <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                      <Loader2 className="w-5 h-5 text-[#00ED64] dark:text-[#00ED64] animate-spin" />
                     </div>
                   )}
                   {isPending && (
@@ -72,7 +72,7 @@ export function StepProgressTracker({
                     isComplete
                       ? 'text-green-600 dark:text-green-400'
                       : isCurrent
-                      ? 'text-blue-600 dark:text-blue-400 font-medium'
+                      ? 'text-[#00ED64] dark:text-[#00ED64] font-medium'
                       : 'text-gray-400 dark:text-gray-600'
                   }`}
                 >

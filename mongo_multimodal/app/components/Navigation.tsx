@@ -42,7 +42,7 @@ export function Navigation() {
                 style={{ filter: 'invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%)' }}
               />&nbsp;&nbsp;&nbsp;
               <Link href="/" className="text-xl font-semibold text-zinc-900 dark:text-white">
-                Vector Search <sub><p className="text-xs">powered by MongoDB Atlas</p></sub>
+                AI Agent Space <sub><p className="text-xs">powered by MongoDB Atlas</p></sub>
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">

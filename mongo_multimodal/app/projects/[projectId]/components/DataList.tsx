@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ClientProjectData } from '@/types/clientTypes';
-import { Eye, Trash2, MessageSquare, BrainCircuit, Image as ImageIcon, X, Loader2, Wand2 } from 'lucide-react';
+import { Eye, Trash2, MessageSquare, BrainCircuit, Image as ImageIcon, X, Loader2, Wand2, FileText, Globe } from 'lucide-react';
 import { useSearchResult } from './SearchResultContext';
 import ProcessButton from './ProcessButton';
 import { ImagePreviewModal } from './ImagePreviewModal';
@@ -21,6 +21,24 @@ const hasValidEmbedding = (item: ClientProjectData): boolean => {
          Array.isArray(item.embedding) &&
          item.embedding.length > 0 &&
          item.embedding.every(val => typeof val === 'number');
+};
+
+// Utility to get type label for chunks
+const getTypeLabel = (item: ClientProjectData): string => {
+  if (item.type === 'text_chunk') return 'Text Chunk';
+  if (item.type === 'web_chunk') return 'Web Chunk';
+  if (item.type === 'image') return 'Image';
+  if (item.type === 'document') return 'Document';
+  return item.type;
+};
+
+// Utility to get chunk indicator
+const getChunkIndicator = (item: ClientProjectData): string | null => {
+  if ((item.type === 'text_chunk' || item.type === 'web_chunk') && item.metadata?.chunkInfo) {
+    const chunkInfo = item.metadata.chunkInfo;
+    return `Chunk ${chunkInfo.chunkIndex + 1}/${chunkInfo.totalChunks}`;
+  }
+  return null;
 };
 
 export default function DataList({ projectId, data, onSelectForChat, onSelectForAgent }: DataListProps) {
@@ -157,16 +175,28 @@ export default function DataList({ projectId, data, onSelectForChat, onSelectFor
                   <p className="font-medium truncate" title={item.metadata.filename}>
                     {item.metadata.filename}
                   </p>
-                  <p className="text-sm text-gray-500">{item.type}</p>
-                  <p className="text-xs text-gray-400">
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-sm text-gray-500">{getTypeLabel(item)}</p>
+                    {getChunkIndicator(item) && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {getChunkIndicator(item)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
                     {(item.metadata.size / 1024).toFixed(2)} KB
                   </p>
+                  {item.type === 'web_chunk' && item.metadata?.chunkInfo?.sourceUrl && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 truncate mt-1">
+                      {item.metadata.chunkInfo.sourceUrl}
+                    </p>
+                  )}
                   {hasValidEmbedding(item) ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mt-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mt-2">
                       Embedded
                     </span>
                   ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 mt-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 mt-2">
                       No Embedding
                     </span>
                   )}

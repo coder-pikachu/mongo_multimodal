@@ -162,7 +162,7 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
               type="checkbox"
               checked={showUnanalyzedOnly}
               onChange={(e) => setShowUnanalyzedOnly(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-[#00ED64] focus:ring-[#00ED64]"
             />
             <span className="text-sm text-gray-700 dark:text-gray-300">
               Unanalyzed only
@@ -174,7 +174,7 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
               type="checkbox"
               checked={showUnembeddedOnly}
               onChange={(e) => setShowUnembeddedOnly(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-[#00ED64] focus:ring-[#00ED64]"
             />
             <span className="text-sm text-gray-700 dark:text-gray-300">
               Unembedded only
@@ -197,7 +197,7 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
             </div>
             <button
               onClick={allSelected ? handleDeselectAll : handleSelectAll}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-xs text-[#13AA52] dark:text-[#00ED64] hover:underline"
             >
               {allSelected ? 'Deselect all' : 'Select all'}
             </button>
@@ -220,7 +220,7 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
               className={`
                 p-3 border rounded-md transition-colors
                 ${selected
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                   : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
                 }
               `}
@@ -229,7 +229,7 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
                 {/* Checkbox */}
                 <div className="mt-0.5 flex-shrink-0 cursor-pointer" onClick={() => toggleItem(item)}>
                   {selected ? (
-                    <CheckSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <CheckSquare className="w-4 h-4 text-[#00ED64] dark:text-[#00ED64]" />
                   ) : (
                     <Square className="w-4 h-4 text-gray-400" />
                   )}
@@ -319,8 +319,8 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
                           handleAnalyze(item._id);
                         }}
                         disabled={analyzingItems.has(item._id)}
-                        className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/30
-                                 text-blue-700 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-green-100 dark:bg-green-900/30
+                                 text-[#00684A] dark:text-[#00ED64] rounded hover:bg-green-200 dark:hover:bg-green-900/50
                                  disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         title="Analyze with AI"
                       >
@@ -397,7 +397,7 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
       {/* Loading More Indicator */}
       {isLoadingMore && (
         <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+          <Loader2 className="w-5 h-5 animate-spin text-[#00ED64]" />
           <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading more...</span>
         </div>
       )}

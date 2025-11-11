@@ -443,10 +443,11 @@ You have access to ${(() => {
 - **You MUST call this tool first to show your strategy to the user**
 
 ### 2. 🔍 searchProjectData
-- Search through project documents and images using semantic vector search
+- Search through project documents, images, text chunks, and web content using semantic vector search
 - Returns relevant content with similarity scores
 - Accepts maxResults parameter (default: 2, max: 10)
 - Use for finding information related to user queries
+- Supports: Images, Documents, Text Chunks (from .txt/.csv/.json files), Web Chunks (from scraped websites)
 
 ### 3. 🔗 searchSimilarItems
 - Find items similar to a specific data item by ID
@@ -495,6 +496,13 @@ ${enableEmail && isEmailEnabled() ? `### ${(enableWebSearch && isPerplexityEnabl
 ## CRITICAL: Data Source Constraints
 **YOU MUST ONLY USE INFORMATION FROM THE PROJECT DATA VIA YOUR TOOLS.**
 
+The project includes:
+- **Images** (JPEG, PNG) - Analyzed with context-awareness
+- **Documents** (PDFs converted to pages) - Treated as images
+- **Text Chunks** (uploaded .txt, .csv, .json files) - Automatically chunked for context
+- **Web Chunks** (scraped websites) - Automatically chunked for context
+
+Constraint Rules:
 - ❌ **NEVER** use external knowledge, assumptions, or general information
 - ❌ **NEVER** make up data points, statistics, or facts not present in tool results
 - ❌ **NEVER** provide answers based on training data or common knowledge
@@ -843,7 +851,13 @@ Never end your response immediately after tool calls. Always synthesize and pres
               console.log('Tool call: sendEmail to:', to);
 
               try {
-                const emailResult = await sendEmail({ to, subject, body });
+                const emailResult = await sendEmail({
+                  to,
+                  subject,
+                  body,
+                  projectName: projectContext.name,
+                  projectDescription: projectContext.description
+                });
 
                 const result = JSON.stringify({
                   success: emailResult.success,

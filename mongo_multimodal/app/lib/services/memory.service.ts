@@ -15,6 +15,7 @@ import {
 
 /**
  * Store a new memory with embedding
+ * Includes memory enrichment: merges with similar existing memories if score > 0.8
  */
 export async function storeMemory(
   db: Db,
@@ -24,6 +25,67 @@ export async function storeMemory(
     // Generate embedding for the memory content
     const embedding = await generateMultimodalEmbedding({ text: input.content }, 'document');
 
+    // Check for similar existing memories for enrichment
+    const existingMemories = await db
+      .collection('agentMemories')
+      .aggregate([
+        {
+          $vectorSearch: {
+            queryVector: embedding,
+            path: 'embedding',
+            numCandidates: 10,
+            limit: 5,
+            index: 'vector_index',
+            filter: {
+              projectId: new ObjectId(input.projectId),
+              type: input.type,
+              $or: [
+                { expiresAt: { $exists: false } },
+                { expiresAt: { $gt: new Date() } },
+              ],
+            },
+          },
+        },
+        {
+          $addFields: {
+            score: { $meta: 'vectorSearchScore' },
+          },
+        },
+      ])
+      .toArray();
+
+    // If we found a highly similar memory (score > 0.8), enrich it instead of creating new
+    if (existingMemories.length > 0 && existingMemories[0].score > 0.8) {
+      const similarMemory = existingMemories[0] as AgentMemory & { score: number };
+
+      // Enrich existing memory
+      const enrichedContent = `${similarMemory.content} [ENRICHED: ${input.content}]`;
+      const newConfidence = Math.min(
+        (similarMemory.metadata.confidence + input.confidence!) / 2,
+        0.95
+      );
+
+      const result = await db.collection('agentMemories').updateOne(
+        { _id: similarMemory._id },
+        {
+          $set: {
+            content: enrichedContent,
+            'metadata.confidence': newConfidence,
+            updatedAt: new Date(),
+          },
+          $addToSet: {
+            tags: { $each: input.tags || [] },
+            relatedMemories: similarMemory._id,
+          },
+          $inc: { 'metadata.accessCount': 0 },
+        }
+      );
+
+      console.log('Memory enriched:', similarMemory._id);
+      return similarMemory._id;
+    }
+
+    // No similar memory found, create new one
     const memory: AgentMemory = {
       projectId: new ObjectId(input.projectId),
       sessionId: input.sessionId,
@@ -357,5 +419,132 @@ export async function extractMemoriesFromConversation(
  */
 export function isMemoryEnabled(): boolean {
   return process.env.AGENT_MEMORY_ENABLED !== 'false';
+}
+
+/**
+ * Extract and store memories from individual chunk with enrichment
+ * Checks for similar existing memories and merges if found
+ */
+export async function extractMemoriesFromChunk(
+  db: Db,
+  projectId: string,
+  sessionId: string,
+  chunkContent: string,
+  metadata: any,
+  userId?: string
+): Promise<ObjectId[]> {
+  try {
+    const memoryIds: ObjectId[] = [];
+
+    if (!chunkContent || chunkContent.length < 10) {
+      return memoryIds;
+    }
+
+    // Extract key fact from chunk
+    const factSnippet = chunkContent.substring(0, 300).trim();
+
+    // Search for similar existing memories
+    let queryEmbedding: number[] = [];
+    try {
+      queryEmbedding = await generateMultimodalEmbedding({ text: factSnippet }, 'query');
+    } catch (error) {
+      console.warn('Could not generate embedding for memory search:', error);
+      // Continue without similarity search
+    }
+
+    if (queryEmbedding.length > 0) {
+      // Search for similar memories
+      const similarMemories = await db
+        .collection('agentMemories')
+        .aggregate([
+          {
+            $vectorSearch: {
+              queryVector: queryEmbedding,
+              path: 'embedding',
+              numCandidates: 10,
+              limit: 5,
+              index: 'vector_index',
+              filter: {
+                projectId: new ObjectId(projectId),
+                type: 'fact'
+              }
+            }
+          },
+          {
+            $addFields: {
+              score: { $meta: 'vectorSearchScore' }
+            }
+          },
+          {
+            $match: {
+              score: { $gte: 0.8 }
+            }
+          }
+        ])
+        .toArray();
+
+      // If similar memory found, enrich it instead of creating new
+      if (similarMemories.length > 0) {
+        const existingMemory = similarMemories[0] as any;
+        const updatedContent = `${existingMemory.content}\n[Reinforced] ${factSnippet}`;
+
+        // Increase confidence for reinforced facts
+        const newConfidence = Math.min(
+          0.95,
+          (existingMemory.metadata.confidence || 0.8) + 0.05
+        );
+
+        await db.collection('agentMemories').updateOne(
+          { _id: existingMemory._id },
+          {
+            $set: {
+              content: updatedContent,
+              'metadata.confidence': newConfidence,
+              'metadata.lastAccessed': new Date(),
+              updatedAt: new Date()
+            },
+            $inc: { 'metadata.accessCount': 1 }
+          }
+        );
+
+        // Link as related memories
+        await db.collection('agentMemories').updateOne(
+          { _id: existingMemory._id },
+          {
+            $addToSet: { relatedMemories: new ObjectId(sessionId) }
+          }
+        );
+
+        memoryIds.push(existingMemory._id);
+        return memoryIds;
+      }
+    }
+
+    // No similar memory found, create new one
+    const newMemory = await storeMemory(db, {
+      projectId,
+      sessionId,
+      userId,
+      type: 'fact',
+      content: factSnippet,
+      source: metadata?.sourceType || 'chunk-extraction',
+      confidence: 0.85,
+      tags: [
+        'chunk-extracted',
+        'auto-enriched',
+        metadata?.chunkType || 'text'
+      ],
+      expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+    });
+
+    if (newMemory) {
+      memoryIds.push(newMemory);
+    }
+
+    return memoryIds;
+  } catch (error) {
+    console.error('Error in extractMemoriesFromChunk:', error);
+    return [];
+  }
 }
 

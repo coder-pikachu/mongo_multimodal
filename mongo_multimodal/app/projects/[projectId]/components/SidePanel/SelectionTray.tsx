@@ -68,7 +68,7 @@ export function SelectionTray() {
           feedToAgent();
           // Optional: Show a toast/notification that context was sent
         }}
-        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+        className="w-full px-4 py-2 bg-[#00ED64] hover:bg-[#13AA52] text-gray-900 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors"
         title={`Send ${selectedItems.length} item${selectedItems.length > 1 ? 's' : ''} to Agent as context`}
       >
         <Send className="w-4 h-4" />

@@ -11,21 +11,21 @@ export function SelectedContextBanner() {
   }
 
   return (
-    <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+    <div className="px-4 py-2 bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+        <span className="text-sm font-medium text-[#00684A] dark:text-[#00ED64]">
           Context: {selectedItems.length} item{selectedItems.length > 1 ? 's' : ''} selected
         </span>
         <button
           onClick={clearSelection}
-          className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+          className="text-xs text-[#13AA52] dark:text-[#00ED64] hover:text-[#00684A] dark:hover:text-[#13AA52]"
         >
           Clear all
         </button>
       </div>
 
       {/* Horizontal scrollable chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-blue-300 dark:scrollbar-thumb-blue-700">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-green-300 dark:scrollbar-thumb-green-700">
         {selectedItems.map((item) => {
           const isImage = item.type === 'image';
 
@@ -33,16 +33,16 @@ export function SelectedContextBanner() {
             <div
               key={item._id}
               className="flex items-center gap-1.5 px-2 py-1.5 bg-white dark:bg-gray-800
-                       border border-blue-200 dark:border-blue-700 rounded-md
-                       flex-shrink-0 group hover:border-blue-400 dark:hover:border-blue-500
+                       border border-green-200 dark:border-green-700 rounded-md
+                       flex-shrink-0 group hover:border-green-400 dark:hover:border-green-500
                        transition-colors"
             >
               {/* Icon */}
               <div className="flex-shrink-0">
                 {isImage ? (
-                  <ImageIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <ImageIcon className="w-3.5 h-3.5 text-[#13AA52] dark:text-[#00ED64]" />
                 ) : (
-                  <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <FileText className="w-3.5 h-3.5 text-[#13AA52] dark:text-[#00ED64]" />
                 )}
               </div>
 

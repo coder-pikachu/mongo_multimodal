@@ -1,33 +1,61 @@
 # MongoDB Multi-Modal Vector Search Application
 
-A powerful enterprise-grade application that enables semantic search across visual and textual data using MongoDB Atlas Vector Search, Claude AI, and VoyageAI. Transform your charts, diagrams, PDFs, and images into searchable knowledge.
+A powerful enterprise-grade application that enables semantic search across visual and textual data using MongoDB Atlas Vector Search, LangGraph, and the Vercel AI SDK. Transform your charts, diagrams, PDFs, and images into searchable knowledge and interact with it through an intelligent AI agent with planning capabilities.
 
-## 🚀 Features
+## Features
 
-- **Multi-Modal Search**: Search across images, PDFs, and documents using natural language or visual queries
-- **AI-Powered Analysis**: Claude AI analyzes visual content and extracts meaningful insights
-- **Vector Embeddings**: VoyageAI generates 1024-dimensional embeddings for semantic similarity
-- **MongoDB Atlas Integration**: Scalable vector search with MongoDB's native capabilities
-- **Real-time Processing**: Automatic embedding generation and content analysis
+### Agent-Centric Interface
+- **Modern Two-Column Layout**: Collapsible side panel (384px) with main agent view
+- **Multi-Select Workflow**: Search/Browse → Select items → Feed to Agent → Get answers
+- **Focus Mode**: Distraction-free interface (Cmd/Ctrl+Shift+F)
+- **Keyboard Shortcuts**: Cmd/Ctrl+B to toggle side panel
+- **Image Preview Modal**: Full-screen zoom, keyboard navigation, download
+
+### Intelligent AI Agent (LangGraph-Powered)
+- **Mandatory Planning Phase**: Agent creates visible execution plan before taking action
+- **Advanced Tool Suite**: 7 specialized tools including vector search, image analysis, web search, and email
+- **Reference Tracking**: Bidirectional tracking between conversations and data sources
+- **Step Execution Monitoring**: Detailed metrics for each tool call (duration, tokens, outputs)
+- **Budget-Aware Reasoning**: Manages step limits intelligently (5 steps general, 8 steps deep mode)
+- **Feature Flags**: Enable/disable web search and email tools independently
+
+### Multi-Modal Search
+- **Vector Search**: Semantic similarity across text and images
+- **Visual Query Support**: Search using natural language or images
+- **Project-Scoped Search**: Fast, paginated results within projects
+- **Configurable Strategies**: Different search parameters for Search/Chat/Agent modes
+
+### AI-Powered Analysis
+- **Dual LLM Support**: Choose between Claude or OpenAI for analysis
+- **Visual Content Extraction**: Analyzes charts, diagrams, tables, and images
+- **Smart Compression**: Reduces token usage by 60-80% before analysis
+- **Contextual Understanding**: Project-aware analysis with user query context
+
+### Data Management
 - **Project Organization**: Group related documents into searchable projects
-- **Interactive Chat Interface**: Natural conversation with your visual data
+- **Batch Processing**: Analyze and process multiple files simultaneously
+- **PDF Support**: Converts PDFs to images page-by-page for analysis
+- **Image Formats**: JPEG, PNG (max 20MB for PDFs)
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Node.js 18+ and npm
-- MongoDB Atlas account with M10+ cluster (required for vector search)
+- MongoDB Atlas account with **M10+ cluster** (required for vector search)
 - API Keys:
-  - [Anthropic Claude API key](https://console.anthropic.com/)
-  - [VoyageAI API key](https://dash.voyageai.com/)
-  - [OpenAI API key](https://platform.openai.com/) (optional)
+  - [Anthropic Claude API key](https://console.anthropic.com/) (required)
+  - [VoyageAI API key](https://dash.voyageai.com/) (required)
+  - [OpenAI API key](https://platform.openai.com/) (optional, for OpenAI analysis)
+  - [Perplexity API key](https://www.perplexity.ai/) (optional, for agent web search)
+  - [Resend API key](https://resend.com/) (optional, for agent email functionality)
+  - [LangSmith API key](https://smith.langchain.com/) (optional, for tracing/debugging)
 
-## 🛠️ Installation
+## Installation
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/coder-pikachu/mongo_multimodal.git
-cd mongo_multimodal/mongo_multimodal
+git clone https://github.com/your-repo/mongo-multimodal.git
+cd mongo-multimodal
 ```
 
 ### 2. Install Dependencies
@@ -41,19 +69,36 @@ npm install
 Create a `.env.local` file in the root directory:
 
 ```bash
-# MongoDB Atlas Connection String
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/multimodal?retryWrites=true&w=majority
+# MongoDB Atlas Connection String (M10+ cluster required)
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/test?retryWrites=true&w=majority
 
-# AI Service API Keys
-VOYAGE_API_KEY=your-voyage-api-key
-ANTHROPIC_API_KEY=your-anthropic-api-key
-OPENAI_API_KEY=your-openai-api-key  # Optional
+# Required: AI Service API Keys
+VOYAGE_API_KEY=your-voyage-api-key            # VoyageAI for embeddings
+ANTHROPIC_API_KEY=your-anthropic-api-key      # Claude for analysis/chat
 
-# LLM Provider Selection
-LLM_FOR_ANALYSIS=claude  # Options: "claude" or "openai"
+# Optional: Alternative LLM Provider
+OPENAI_API_KEY=your-openai-api-key            # OpenAI (optional alternative)
+LLM_FOR_ANALYSIS=claude                        # Options: "claude" or "openai"
 
-# Application URL (for local development)
-VERCEL_URL=http://localhost:3000
+# Optional: Agent External Tools
+PERPLEXITY_API_KEY=your-perplexity-api-key    # Web search capability
+AGENT_WEB_SEARCH_ENABLED=true                  # Enable/disable web search
+
+EMAIL_API_KEY=your-resend-api-key              # Email sending via Resend
+EMAIL_FROM=noreply@yourdomain.com              # From address for emails
+EMAIL_ENABLED=true                             # Enable/disable email tool
+
+# Optional: Agent Configuration
+AGENT_PLANNING_ENABLED=true                    # Enable planning phase (recommended)
+
+# Optional: LangSmith Tracing (for debugging agent)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your-langsmith-api-key
+LANGCHAIN_PROJECT=mongo-multimodal             # Organize runs in LangSmith
+
+# Optional: Unstructured.io (for advanced document parsing)
+UNSTRUCTURED_API_URL=http://localhost:8000
+UNSTRUCTURED_API_KEY=                          # Leave empty for self-hosted
 ```
 
 ### 4. MongoDB Atlas Setup
@@ -63,7 +108,6 @@ VERCEL_URL=http://localhost:3000
 You can create the vector search index in two ways:
 
 **Option 1: Using the Script (Recommended)**
-Run the provided script after setting up your environment:
 ```bash
 npm run create:index
 ```
@@ -89,7 +133,7 @@ npm run create:index
 ```
 
 4. Name the index: `vector_index`
-5. Select the database: `multimodal` (or your database name)
+5. Select the database: `test`
 6. Select the collection: `projectData`
 
 **Note**: Vector search requires MongoDB Atlas M10 tier or higher.
@@ -104,7 +148,7 @@ npm run test:db
 npm run create:index
 ```
 
-## 🚦 Getting Started
+## Getting Started
 
 ### Start the Development Server
 
@@ -114,7 +158,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 📖 Complete Usage Flow
+## Complete Usage Flow
 
 ### Step 1: Create a Project
 
@@ -128,7 +172,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ### Step 2: Upload Documents
 
 1. Open your newly created project
-2. Click the "Upload Files" button
+2. Use the side panel's **Upload** tab
 3. Select files to upload:
    - **Images**: JPEG/PNG files (charts, graphs, diagrams)
    - **PDFs**: Multi-page documents (reports, presentations)
@@ -150,119 +194,187 @@ After uploading, documents need to be processed to generate embeddings:
 3. Monitor the progress bar as files are processed
 
 Processing includes:
-- Analyzing images/PDFs with Claude AI
-- Generating vector embeddings with VoyageAI
-- Extracting metadata and insights
+- Analyzing images/PDFs with Claude AI or OpenAI (based on `LLM_FOR_ANALYSIS`)
+- Generating 1024-dimensional vector embeddings with VoyageAI
+- Extracting metadata, tags, and insights
 
-### Step 4: Search Your Data
+### Step 4: Interact with the AI Agent
 
-#### Project-Specific Search
-Within a project, use the chat interface:
+The agent-centric interface provides a seamless workflow:
+
+1. **Search or Browse** (Side Panel):
+   - Use the Search tab for vector search queries
+   - Use the Browse tab to explore all uploaded documents
+   - Preview images with the eye icon (full-screen modal with zoom)
+
+2. **Select Context** (Multi-Select):
+   - Check boxes next to relevant documents
+   - View selected items in the selection tray
+   - Feed selected items as context to the agent
+
+3. **Ask the Agent**:
+   - Type your question in the agent chat
+   - Agent creates a visible plan showing its strategy
+   - Watch step-by-step progress as tools are executed
+   - See real-time reference tracking
+
+4. **Review Sources**:
+   - Expand the References panel to see all sources used
+   - Click on references to view full content
+   - Track which data items contributed to the answer
+
+#### Agent Capabilities
+
+The agent has access to these tools:
+
+**Core Tools (Always Available):**
+- `planQuery` - Creates execution plan (mandatory first step)
+- `searchProjectData` - Vector search with configurable results (1-10)
+- `searchSimilarItems` - Find related content by similarity
+- `analyzeImage` - Context-aware image analysis
+- `projectDataAnalysis` - Fetch stored analysis without base64
+
+**External Tools (Optional):**
+- `searchWeb` - Perplexity AI web search with citations (requires `PERPLEXITY_API_KEY`)
+- `sendEmail` - Send emails via Resend API (requires `EMAIL_API_KEY`)
+
+#### Agent Modes
+
+- **General Mode** (5 steps): Quick queries, 1-2 searches + 1-2 analyses
+- **Deep Mode** (8 steps): Complex queries, 2-3 searches + 3-4 analyses
+
+### Step 5: View Analytics
+
+Track agent performance and usage:
+- Navigate to `/api/agent/analytics` endpoint
+- Filter by project, session, or date range
+- View tool usage statistics, step budgets, and reference patterns
+
+## Architecture Overview
 
 ```
-Example queries:
-- "Show me revenue trends from Q3"
-- "Find all charts showing growth patterns"
-- "What are the key insights from the financial reports?"
+┌─────────────────────────────────────────────────────────────────┐
+│                     Next.js 15 App (React 19)                   │
+│                  Agent-Centric UI with Side Panel               │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                ┌───────────────┼───────────────┐
+                ▼               ▼               ▼
+        ┌───────────┐   ┌───────────┐   ┌───────────┐
+        │  Search   │   │   Chat    │   │  Agent    │
+        │  Mode     │   │   Mode    │   │  Mode     │
+        │  (Vector) │   │  (AI SDK) │   │(LangGraph)│
+        └─────┬─────┘   └─────┬─────┘   └─────┬─────┘
+              │               │               │
+              └───────────────┼───────────────┘
+                              ▼
+                    ┌──────────────────┐
+                    │  Service Layer   │
+                    ├──────────────────┤
+                    │ • Vector Search  │
+                    │ • Project Data   │
+                    │ • References     │
+                    │ • Perplexity     │
+                    │ • Email          │
+                    └────────┬─────────┘
+                             │
+            ┌────────────────┼────────────────┐
+            ▼                ▼                ▼
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │  MongoDB     │  │   VoyageAI   │  │  Claude AI   │
+    │  Atlas       │  │  (Embeddings)│  │ / OpenAI     │
+    │ (Vector DB)  │  │  1024-dim    │  │ (Analysis)   │
+    └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
-#### Global Search
-From the homepage, use the global search bar:
+## Project Structure
 
 ```
-Example queries:
-- "Find all manufacturing defect images across projects"
-- "Show compliance charts from any department"
-- "Locate molecular structures similar to compound X"
+/app/
+├── api/                        # Backend API routes
+│   ├── agent/                 # LangGraph agent endpoint (AI SDK)
+│   │   └── route.ts          # 7 tools, planning, reference tracking
+│   ├── chat/                  # Vercel AI SDK chat endpoint
+│   ├── projects/              # Project CRUD operations
+│   │   ├── [projectId]/
+│   │   │   ├── search/       # Vector search endpoint
+│   │   │   ├── upload/       # File upload endpoint
+│   │   │   └── data/         # Bulk operations (analyze, process)
+│   │   └── data/[id]/        # Single-item operations
+│   │       ├── analyze/      # AI analysis endpoint
+│   │       ├── process/      # Embedding generation
+│   │       └── references/   # Reference tracking
+│   └── ...
+├── lib/                       # Core utilities
+│   ├── services/             # Service layer (business logic)
+│   │   ├── projectData.service.ts    # Data operations
+│   │   ├── vectorSearch.service.ts   # Unified vector search
+│   │   ├── references.service.ts     # Bidirectional tracking
+│   │   ├── perplexity.service.ts     # Web search
+│   │   └── email.service.ts          # Email sending
+│   ├── mongodb.ts            # Database connection
+│   ├── claude.ts             # LLM response generation
+│   ├── voyageai.ts           # Embedding generation
+│   ├── image-utils.ts        # Image compression
+│   └── pdf-to-image.ts       # PDF processing
+├── projects/[projectId]/      # Project UI pages
+│   └── components/           # React components
+│       ├── AgentCentricLayout.tsx  # Main layout
+│       ├── AgentView.tsx           # Agent interface
+│       ├── SidePanel/              # Search, Browse, Upload
+│       ├── Agent/                  # Plan, Progress, References
+│       └── SelectionContext.tsx    # Multi-select state
+├── types/                     # TypeScript definitions
+│   ├── models.ts             # Server-side types
+│   └── clientTypes.ts        # Client-side types
+└── scripts/                   # Utility scripts
+    ├── test-db.ts            # Test MongoDB connection
+    └── create-vector-index.ts # Create vector indexes
 ```
 
-#### Visual Search
-1. Click the image icon in the search bar
-2. Upload or drag an image
-3. The system finds visually and semantically similar content
-
-### Step 5: Interact with Results
-
-- **View Details**: Click on any result to see full analysis
-- **Image Preview**: Click the eye icon to view images in full size
-- **Download**: Export search results for reporting
-- **Refine Search**: Use follow-up questions in the chat
-
-## 🏗️ Architecture Overview
-
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Next.js App   │────▶│  API Routes      │────▶│  MongoDB Atlas  │
-│   (React UI)    │     │  (Serverless)    │     │  (Vector DB)    │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │   AI Services       │
-                    ├─────────────────────┤
-                    │ • Claude AI         │
-                    │ • VoyageAI          │
-                    │ • OpenAI (optional) │
-                    └─────────────────────┘
-```
-
-## 📁 Project Structure
-
-```
-/app/                    # Next.js App Router
-├── api/                 # Backend API routes
-│   ├── projects/       # Project CRUD operations
-│   ├── search/         # Global search endpoint
-│   └── vector-search/  # Vector similarity search
-├── lib/                # Core utilities
-│   ├── mongodb.ts      # Database connection
-│   ├── claude.ts       # AI integrations
-│   └── voyageai.ts     # Embedding generation
-├── projects/           # Project UI pages
-└── components/         # Reusable React components
-```
-
-## 🔧 Available Scripts
+## Available Scripts
 
 ```bash
 # Development
-npm run dev              # Start development server
-npm run build           # Build for production
-npm run start           # Start production server
+npm run dev              # Start development server with Turbopack
+npm run build            # Build for production
+npm run start            # Start production server
+npm run lint             # Run ESLint
 
 # Database
-npm run test:db         # Test MongoDB connection
-npm run create:index    # Create vector search indexes
-
-# Code Quality
-npm run lint            # Run ESLint
+npm run test:db          # Test MongoDB connection
+npm run create:index     # Create vector search indexes
 ```
 
-## 🎯 Use Cases
+## Use Cases
 
 ### Financial Services
 - Search quarterly reports by chart patterns
 - Find anomalies across financial visualizations
+- Compare internal reports with web articles
 - Connect insights from multiple documents
 
 ### Manufacturing
 - Locate technical diagrams by description
 - Find similar defect patterns across quality reports
 - Search equipment manuals with natural language
+- Predict maintenance needs from visual patterns
 
 ### Healthcare & Research
 - Search medical images by visual similarity
 - Find molecular structures across research papers
+- Compare clinical trial results
 - Connect patient data with clinical insights
 
 ### Enterprise Knowledge Management
 - Unified search across all visual assets
 - Break down information silos
 - Preserve institutional knowledge
+- Automated report generation via email
 
-## 🚀 Production Deployment
+## Production Deployment
 
-### Vercel Deployment
+### Vercel Deployment (Recommended)
 
 1. Install Vercel CLI: `npm i -g vercel`
 2. Run: `vercel`
@@ -282,72 +394,278 @@ EXPOSE 3000
 CMD ["npm", "start"]
 ```
 
-## 🔒 Security Best Practices
+## Security Best Practices
 
 1. **API Keys**: Never commit API keys to version control
 2. **MongoDB**: Use connection strings with authentication
-3. **File Uploads**: Implement file size and type restrictions
+3. **File Uploads**: Implement file size and type restrictions (already in place)
 4. **Access Control**: Add authentication for production use
-5. **Data Privacy**: Ensure compliance with data regulations
+5. **Data Privacy**: Ensure compliance with data regulations (GDPR, HIPAA, etc.)
+6. **Rate Limiting**: Implement rate limits for API endpoints
+7. **Input Validation**: All inputs validated with Zod schemas
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
 1. **"Vector index not found"**
    - Run `npm run create:index`
    - Ensure index name is `vector_index`
+   - Check database name is `test` (hardcoded in `lib/mongodb.ts`)
 
 2. **"Failed to generate embeddings"**
-   - Check VoyageAI API key
-   - Verify API quota hasn't been exceeded
+   - Check `VOYAGE_API_KEY` in `.env.local`
+   - Verify VoyageAI API quota hasn't been exceeded
+   - Check network connectivity
 
 3. **"MongoDB connection failed"**
-   - Verify connection string
-   - Check IP whitelist in Atlas
+   - Verify `MONGODB_URI` connection string
+   - Check IP whitelist in Atlas (allow your IP or 0.0.0.0/0 for all)
+   - Ensure cluster is M10+ for vector search
 
 4. **"File upload fails"**
    - Check file size (max 20MB for PDFs)
-   - Ensure proper file format
+   - Ensure proper file format (JPEG, PNG for images)
+   - Check browser console for errors
 
-## 📚 API Reference
+5. **"Agent planning not working"**
+   - Verify `AGENT_PLANNING_ENABLED=true` in `.env.local`
+   - Check LangSmith for trace logs if enabled
+   - Ensure Claude API key is valid
+
+6. **"Web search tool not available"**
+   - Set `PERPLEXITY_API_KEY` in `.env.local`
+   - Ensure `AGENT_WEB_SEARCH_ENABLED=true`
+   - Check Perplexity API quota
+
+## API Reference
 
 ### Search Endpoints
 
 ```typescript
-// Global search
-POST /api/search
-{
-  "query": "revenue charts Q3",
-  "type": "text" | "image"
-}
-
-// Project-specific search
+// Project-specific vector search
 POST /api/projects/[projectId]/search
 {
-  "query": "manufacturing defects",
-  "type": "text" | "image"
+  "query": "revenue charts Q3",
+  "type": "text" | "image",
+  "page": 1,
+  "limit": 10
+}
+
+Response: {
+  results: ProjectData[],
+  total: number,
+  page: number,
+  totalPages: number
 }
 ```
 
-### File Upload
+### File Operations
 
 ```typescript
 // Upload file to project
 POST /api/projects/[projectId]/upload
-FormData: {
-  file: File
+FormData: { file: File }
+
+Response: { success: true, data: ProjectData }
+
+// Analyze single document (AI analysis)
+POST /api/projects/data/[id]/analyze
+Response: { success: true, data: ProjectData }
+
+// Process single document (generate embedding)
+POST /api/projects/data/[id]/process
+Response: { success: true, data: ProjectData }
+
+// Bulk analyze
+POST /api/projects/[projectId]/data/analyze
+{ "dataIds": ["id1", "id2", ...] }
+
+// Bulk process
+POST /api/projects/[projectId]/data/process
+{ "dataIds": ["id1", "id2", ...] }
+```
+
+### Agent Endpoints
+
+```typescript
+// Agent chat (streaming)
+POST /api/agent
+{
+  "messages": Message[],
+  "projectId": string,
+  "sessionId": string,
+  "analysisDepth": "general" | "deep"
+}
+Response: StreamingTextResponse with tool calls
+
+// Agent analytics
+GET /api/agent/analytics?projectId=xxx&startDate=xxx&endDate=xxx
+Response: {
+  toolUsage: { [tool: string]: { count, avgDuration, totalDuration } },
+  stepBudget: { average, min, max },
+  planAccuracy: { avgEstimated, avgActual },
+  references: { total, byType: {...}, topItems: [...] },
+  insights: {...}
 }
 ```
 
-### Process Documents
+### Reference Tracking
 
 ```typescript
-// Generate embeddings for a document
-POST /api/projects/data/[documentId]/process
+// Get references for a data item
+GET /api/projects/data/[id]/references
+Response: {
+  dataItem: ProjectData,
+  conversations: Conversation[]
+}
 ```
 
-## 🤝 Contributing
+## Advanced Configuration
+
+### LLM Provider Selection
+
+Configure which LLM analyzes your images:
+
+```bash
+# Use Claude (faster, cheaper for images)
+LLM_FOR_ANALYSIS=claude
+
+# Use OpenAI (alternative)
+LLM_FOR_ANALYSIS=openai
+```
+
+Models used:
+- Claude: `claude-haiku-4-5-20251001`
+- OpenAI: `gpt-5-nano-2025-08-07`
+
+### Vector Search Strategies
+
+The application uses different search strategies based on mode:
+
+```typescript
+// Search Mode: Paginated, broader threshold
+{ limit: 200, numCandidates: 800, threshold: 0.3 }
+
+// Chat Mode: Tight focus
+{ limit: 2, numCandidates: 150, threshold: 0.2 }
+
+// Agent Mode: High precision
+{ limit: 2, numCandidates: 150, threshold: 0.6 }
+```
+
+### Agent Step Budget
+
+Control agent depth:
+
+```typescript
+// General mode (default)
+analysisDepth: "general"  // 5 steps total
+
+// Deep mode
+analysisDepth: "deep"     // 8 steps total
+```
+
+## Performance Considerations
+
+- **Vector Search Pagination**: Limits result sets for fast responses
+- **Image Compression**: Reduces token usage by 60-80%
+- **Conversation Storage**: Base64 stripped before saving (16MB limit)
+- **HMR Safety**: MongoDB client uses global caching in development
+- **Reference Tracking**: Non-blocking updates
+- **Tool Execution**: Parallel execution where possible
+- **Service Layer**: Centralized logic prevents duplication
+
+## Database Schema
+
+### Collections
+
+**projects**
+```typescript
+{
+  _id: ObjectId,
+  name: string,
+  description: string,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+**projectData**
+```typescript
+{
+  _id: ObjectId,
+  projectId: ObjectId,
+  type: 'image' | 'document',
+  content: {
+    text?: string,
+    base64?: string
+  },
+  metadata: {
+    filename: string,
+    mimeType: string,
+    size: number
+  },
+  analysis?: {
+    description: string,
+    tags: string[],
+    insights: string[],
+    facets: Record<string, any>
+  },
+  embedding?: number[],        // 1024-dimensional vector
+  referencedBy?: Array<{       // Bidirectional tracking
+    conversationId: ObjectId,
+    sessionId: string,
+    timestamp: Date,
+    context: string,
+    toolCall: string
+  }>,
+  processedAt?: Date,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+**conversations**
+```typescript
+{
+  _id: ObjectId,
+  projectId: string,
+  sessionId: string,
+  message: {
+    role: 'user' | 'assistant',
+    content: string
+  },
+  timestamp: Date,
+  plan?: {                     // Agent's execution plan
+    steps: string[],
+    estimatedToolCalls: number,
+    rationale: string,
+    needsExternalData: boolean,
+    toolsToUse: string[]
+  },
+  references?: Array<{         // Sources used
+    type: 'projectData' | 'web' | 'email',
+    dataId?: string,
+    url?: string,
+    title: string,
+    usedInStep: number,
+    toolCall: string,
+    score?: number
+  }>,
+  toolExecutions?: Array<{     // Detailed tracking
+    step: number,
+    tool: string,
+    input: Record<string, unknown>,
+    output: unknown,
+    duration: number,
+    tokens?: number,
+    timestamp: Date
+  }>
+}
+```
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
@@ -355,23 +673,25 @@ POST /api/projects/data/[documentId]/process
 4. Push to branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- MongoDB Atlas for vector search capabilities
-- Anthropic for Claude AI
-- VoyageAI for multimodal embeddings
-- Next.js team for the amazing framework
+- MongoDB Atlas for enterprise-grade vector search
+- Anthropic for Claude AI and the incredible multimodal capabilities
+- VoyageAI for state-of-the-art multimodal embeddings
+- Vercel for the AI SDK and seamless deployment
+- LangChain/LangGraph for agentic workflow capabilities
+- Next.js team for the amazing React framework
 
-## 📞 Support
+## Support
 
-- Documentation: [Link to docs]
+- Documentation: This README
 - Issues: [GitHub Issues](https://github.com/your-repo/mongo-multimodal/issues)
-- Discord: [Join our community]
+- CLAUDE.md: See project instructions for developers
 
 ---
 
-Built with ❤️ using MongoDB Atlas Vector Search
+Built with MongoDB Atlas Vector Search, Claude AI, VoyageAI, and Next.js 15

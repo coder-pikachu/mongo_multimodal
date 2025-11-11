@@ -1,7 +1,7 @@
 
 'use client'
 import { useState, useEffect, useCallback } from 'react';
-import { Bot, User, Send, ChevronDown, ChevronRight, BrainCircuit, History, MessageSquare, Image as ImageIcon, Loader2, Search, Globe, Eye, ChevronUp, Copy, Check } from 'lucide-react';
+import { Bot, User, Send, ChevronDown, ChevronRight, BrainCircuit, History, MessageSquare, Image as ImageIcon, Loader2, Search, Globe, Eye, ChevronUp, Copy, Check, Brain, Database, Mail, ClipboardList, Link } from 'lucide-react';
 import { useSelection } from './SelectionContext';
 import { Message, AgentPlan, ConversationReference } from '@/types/clientTypes';
 import ReactMarkdown from 'react-markdown';
@@ -37,6 +37,12 @@ export default function AgentView({ projectId }: AgentViewProps) {
     const [conversationsLoading, setConversationsLoading] = useState(false);
     const [showConversations, setShowConversations] = useState(false);
     const [analysisDepth, setAnalysisDepth] = useState<'general' | 'deep'>('general');
+
+    // Tool toggles
+    const [enableWebSearch, setEnableWebSearch] = useState(false);
+    const [enableEmail, setEnableEmail] = useState(false);
+    const [enableMemory, setEnableMemory] = useState(true); // Memory enabled by default
+
     const { selectedItems, agentContext } = useSelection();
 
     // Manual state management instead of useChat
@@ -76,6 +82,61 @@ export default function AgentView({ projectId }: AgentViewProps) {
         }
     };
 
+    // Handle citation click to preview image
+    const handleCitationClick = async (filename: string) => {
+        console.log('[Citation Click] Looking for:', filename);
+        console.log('[Citation Click] Available references:', references);
+
+        // Clean up filename - remove extensions and normalize
+        const cleanFilename = filename.toLowerCase().replace(/\.(jpg|jpeg|png|pdf|gif)$/i, '');
+
+        // Try to find dataId in references by filename (fuzzy matching)
+        const ref = references.find(r => {
+            if (!r.title) return false;
+            const cleanTitle = r.title.toLowerCase().replace(/\.(jpg|jpeg|png|pdf|gif)$/i, '');
+            return cleanTitle.includes(cleanFilename) ||
+                   cleanFilename.includes(cleanTitle) ||
+                   r.title.toLowerCase().includes(filename.toLowerCase());
+        });
+
+        if (ref?.dataId) {
+            console.log('[Citation Click] Found in references:', ref.dataId);
+            setPreviewDataId(ref.dataId);
+            return;
+        }
+
+        // If not in references, fetch all project data and search
+        console.log('[Citation Click] Not in references, searching project data...');
+        try {
+            const response = await fetch(`/api/projects/${projectId}/data`);
+            if (response.ok) {
+                const data = await response.json();
+                console.log('[Citation Click] Project data count:', data.length);
+
+                // Find by filename (fuzzy match)
+                const item = data.find((d: any) => {
+                    const itemFilename = d.metadata?.filename?.toLowerCase() || '';
+                    const itemClean = itemFilename.replace(/\.(jpg|jpeg|png|pdf|gif)$/i, '');
+                    return itemFilename.includes(filename.toLowerCase()) ||
+                           filename.toLowerCase().includes(itemFilename) ||
+                           itemClean.includes(cleanFilename) ||
+                           cleanFilename.includes(itemClean);
+                });
+
+                if (item) {
+                    console.log('[Citation Click] Found item:', item._id, item.metadata.filename);
+                    setPreviewDataId(item._id);
+                } else {
+                    console.warn('[Citation Click] No matching file found for:', filename);
+                    alert(`Could not find image: ${filename}`);
+                }
+            }
+        } catch (error) {
+            console.error('[Citation Click] Error finding image:', error);
+            alert('Error loading image preview');
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
@@ -108,7 +169,11 @@ export default function AgentView({ projectId }: AgentViewProps) {
                     projectId,
                     sessionId: currentSessionId,
                     analysisDepth,
-                    selectedDataIds // Pass the selected item IDs
+                    selectedDataIds, // Pass the selected item IDs
+                    // Tool toggles from UI
+                    enableWebSearch,
+                    enableEmail,
+                    enableMemory
                 })
             });
 
@@ -427,39 +492,62 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                         h3: ({children}) => <h3 className="text-sm font-medium mb-1">{children}</h3>,
                                         p: ({children}) => {
                                             // Highlight citations in paragraphs
-                                            if (typeof children === 'string') {
-                                                const citationRegex = /\[(?:Source|Image|Analysis): ([^\]]+)\]/g;
-                                                const parts = [];
-                                                let lastIndex = 0;
-                                                let match;
+                                            // Convert children to string if needed
+                                            const textContent = typeof children === 'string'
+                                                ? children
+                                                : (Array.isArray(children)
+                                                    ? children.map(c => typeof c === 'string' ? c : '').join('')
+                                                    : String(children || ''));
 
-                                                while ((match = citationRegex.exec(children)) !== null) {
+                                            const citationRegex = /\[(?:Source|Image|Analysis): ([^\]]+)\]/g;
+                                            const matches = Array.from(textContent.matchAll(citationRegex));
+
+                                            if (matches.length > 0) {
+                                                const parts: (string | JSX.Element)[] = [];
+                                                let lastIndex = 0;
+
+                                                matches.forEach((match, idx) => {
                                                     // Add text before citation
-                                                    if (match.index > lastIndex) {
-                                                        parts.push(children.substring(lastIndex, match.index));
+                                                    if (match.index !== undefined && match.index > lastIndex) {
+                                                        parts.push(textContent.substring(lastIndex, match.index));
                                                     }
-                                                    // Add citation as badge
+
+                                                    // Add citation as clickable badge
                                                     const citationType = match[0].startsWith('[Source') ? 'source' : match[0].startsWith('[Image') ? 'image' : 'analysis';
                                                     const badgeColor = citationType === 'source' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
                                                                        citationType === 'image' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
                                                                        'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300';
+                                                    const filename = match[1]; // Extract filename from capture group
+
                                                     parts.push(
-                                                        <span key={match.index} className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ml-1 ${badgeColor}`}>
+                                                        <button
+                                                            key={`citation-${idx}`}
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                handleCitationClick(filename);
+                                                            }}
+                                                            className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ml-1 ${badgeColor} cursor-pointer hover:opacity-80 transition-opacity`}
+                                                            title={`Click to preview ${filename}`}
+                                                        >
                                                             {match[0]}
-                                                        </span>
+                                                        </button>
                                                     );
-                                                    lastIndex = match.index + match[0].length;
-                                                }
+
+                                                    if (match.index !== undefined) {
+                                                        lastIndex = match.index + match[0].length;
+                                                    }
+                                                });
 
                                                 // Add remaining text
-                                                if (lastIndex < children.length) {
-                                                    parts.push(children.substring(lastIndex));
+                                                if (lastIndex < textContent.length) {
+                                                    parts.push(textContent.substring(lastIndex));
                                                 }
 
-                                                if (parts.length > 1) {
-                                                    return <p className="mb-2 last:mb-0">{parts}</p>;
-                                                }
+                                                return <p className="mb-2 last:mb-0">{parts}</p>;
                                             }
+
                                             return <p className="mb-2 last:mb-0">{children}</p>;
                                         },
                                         ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
@@ -468,12 +556,27 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                         code: ({children}) => {
                                             // Also highlight citations in inline code
                                             const text = String(children);
-                                            if (text.match(/^\[(?:Source|Image|Analysis):/)) {
+                                            const citationMatch = text.match(/^\[(?:Source|Image|Analysis): ([^\]]+)\]$/);
+                                            if (citationMatch) {
                                                 const citationType = text.startsWith('[Source') ? 'source' : text.startsWith('[Image') ? 'image' : 'analysis';
                                                 const badgeColor = citationType === 'source' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
                                                                    citationType === 'image' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
                                                                    'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300';
-                                                return <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeColor}`}>{children}</span>;
+                                                const filename = citationMatch[1];
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            handleCitationClick(filename);
+                                                        }}
+                                                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeColor} cursor-pointer hover:opacity-80 transition-opacity`}
+                                                        title={`Click to preview ${filename}`}
+                                                    >
+                                                        {children}
+                                                    </button>
+                                                );
                                             }
                                             return <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-xs">{children}</code>;
                                         },
@@ -591,14 +694,26 @@ export default function AgentView({ projectId }: AgentViewProps) {
                                     {messageToolCalls.map((toolCall, idx) => (
                                         <div key={idx} className="bg-gray-50 dark:bg-gray-900 rounded p-3 text-xs border dark:border-gray-800">
                                             <div className="flex items-center gap-2 font-semibold mb-2">
-                                                {toolCall.toolName === 'searchProjectData' ? (
+                                                {toolCall.toolName === 'planQuery' ? (
+                                                    <ClipboardList className="h-3 w-3" />
+                                                ) : toolCall.toolName === 'searchProjectData' ? (
                                                     <Search className="h-3 w-3" />
+                                                ) : toolCall.toolName === 'searchSimilarItems' ? (
+                                                    <Link className="h-3 w-3" />
                                                 ) : toolCall.toolName === 'analyzeImage' ? (
                                                     <Eye className="h-3 w-3" />
                                                 ) : toolCall.toolName === 'projectDataAnalysis' ? (
                                                     <BrainCircuit className="h-3 w-3" />
+                                                ) : toolCall.toolName === 'rememberContext' ? (
+                                                    <Brain className="h-3 w-3 text-purple-500" />
+                                                ) : toolCall.toolName === 'recallMemory' ? (
+                                                    <Database className="h-3 w-3 text-purple-500" />
+                                                ) : toolCall.toolName === 'searchWeb' ? (
+                                                    <Globe className="h-3 w-3 text-blue-500" />
+                                                ) : toolCall.toolName === 'sendEmail' ? (
+                                                    <Mail className="h-3 w-3 text-green-500" />
                                                 ) : (
-                                                    <Globe className="h-3 w-3" />
+                                                    <MessageSquare className="h-3 w-3" />
                                                 )}
                                                 {toolCall.toolName}
                                             </div>
@@ -836,33 +951,70 @@ export default function AgentView({ projectId }: AgentViewProps) {
                 />
             )}
 
-            <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-800">
-                <div className="mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-600 dark:text-gray-400">Analysis Depth:</label>
-                        <button
-                            type="button"
-                            onClick={() => setAnalysisDepth('general')}
-                            className={`px-3 py-1 text-sm rounded-md ${
-                                analysisDepth === 'general'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-200 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
-                            }`}
-                        >
-                                                        General (up to 3 analyses)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setAnalysisDepth('deep')}
-                            className={`px-3 py-1 text-sm rounded-md ${
-                                analysisDepth === 'deep'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-200 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
-                            }`}
-                        >
-                            Deep (up to 5 analyses)
-                        </button>
-                    </div>
+            <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
+                {/* Tool Toggles - Compact horizontal layout */}
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mr-1">Tools:</span>
+
+                    {/* Deep Analysis Toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setAnalysisDepth(analysisDepth === 'deep' ? 'general' : 'deep')}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            analysisDepth === 'deep'
+                                ? 'bg-blue-500 text-white shadow-sm'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                        title={analysisDepth === 'deep' ? 'Deep Analysis: 5 analyses' : 'General Analysis: 3 analyses'}
+                    >
+                        <Brain className="h-3.5 w-3.5" />
+                        <span>Deep ({analysisDepth === 'deep' ? '5' : '3'})</span>
+                    </button>
+
+                    {/* Memory Toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setEnableMemory(!enableMemory)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            enableMemory
+                                ? 'bg-purple-500 text-white shadow-sm'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                        title={enableMemory ? 'Memory: ON - Agent remembers context' : 'Memory: OFF'}
+                    >
+                        <Database className="h-3.5 w-3.5" />
+                        <span>Memory</span>
+                    </button>
+
+                    {/* Web Search Toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setEnableWebSearch(!enableWebSearch)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            enableWebSearch
+                                ? 'bg-green-500 text-white shadow-sm'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                        title={enableWebSearch ? 'Web Search: ON - Can search external sources' : 'Web Search: OFF'}
+                    >
+                        <Globe className="h-3.5 w-3.5" />
+                        <span>Web</span>
+                    </button>
+
+                    {/* Email Toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setEnableEmail(!enableEmail)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            enableEmail
+                                ? 'bg-orange-500 text-white shadow-sm'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                        title={enableEmail ? 'Email: ON - Can send emails' : 'Email: OFF'}
+                    >
+                        <Mail className="h-3.5 w-3.5" />
+                        <span>Email</span>
+                    </button>
                 </div>
                 <form onSubmit={handleSubmit} className="flex gap-2">
                     <input

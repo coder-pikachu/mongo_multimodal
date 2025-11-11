@@ -7,7 +7,9 @@ import { compressImage, estimateImageTokens } from '@/lib/image-utils';
 import { searchWeb, isPerplexityEnabled } from '@/lib/services/perplexity.service';
 import { sendEmail, isEmailEnabled, createEmailConfirmationPrompt } from '@/lib/services/email.service';
 import { extractReferencesFromToolResults, updateConversationWithReferences } from '@/lib/services/references.service';
+import { storeMemory, retrieveMemories, updateMemoryAccess, getMemoryContext, isMemoryEnabled } from '@/lib/services/memory.service';
 import { AgentPlan, ToolExecution } from '@/types/models';
+import { MemoryType } from '@/types/agent.types';
 import { z } from 'zod';
 import { ObjectId } from 'mongodb';
 
@@ -345,7 +347,17 @@ async function saveConversation(
 
 export async function POST(req: Request) {
   try {
-    const { messages, projectId, sessionId = `session_${Date.now()}`, analysisDepth = 'general', selectedDataIds } = await req.json();
+    const {
+      messages,
+      projectId,
+      sessionId = `session_${Date.now()}`,
+      analysisDepth = 'general',
+      selectedDataIds,
+      // Tool toggles from UI (default based on feature availability)
+      enableWebSearch = false,
+      enableEmail = false,
+      enableMemory = true
+    } = await req.json();
 
     if (!projectId) {
       return new Response("Project ID is required", { status: 400 });
@@ -412,7 +424,13 @@ ${selectedDataIds.length > 2 ? `- And so on for the other selected items` : ''}
 **DO NOT search for these items by filename** - use the provided data IDs directly! This saves tool calls and ensures accuracy.` : ''}
 
 ## Your Capabilities
-You have access to ${isPerplexityEnabled() && isEmailEnabled() ? 'seven' : isPerplexityEnabled() || isEmailEnabled() ? 'six' : 'five'} powerful tools:
+You have access to ${(() => {
+  let count = 5; // Base tools: planQuery, searchProjectData, searchSimilarItems, analyzeImage, projectDataAnalysis
+  if (enableMemory && isMemoryEnabled()) count += 2; // rememberContext, recallMemory
+  if (enableWebSearch && isPerplexityEnabled()) count += 1; // searchWeb
+  if (enableEmail && isEmailEnabled()) count += 1; // sendEmail
+  return count === 5 ? 'five' : count === 6 ? 'six' : count === 7 ? 'seven' : count === 8 ? 'eight' : 'nine';
+})()} powerful tools:
 
 ### Core Research Tools
 
@@ -446,16 +464,30 @@ You have access to ${isPerplexityEnabled() && isEmailEnabled() ? 'seven' : isPer
 - Fetch the stored analysis for a specific project item by id
 - Returns description, tags, insights, facets, and metadata (no base64) for precise reasoning
 
-${isPerplexityEnabled() ? `### External Tools
+${enableMemory && isMemoryEnabled() ? `### Memory Tools
 
-### 6. 🌐 searchWeb
+### 6. 🧠 rememberContext
+- Store important information, facts, preferences, or insights for future reference
+- Use when you learn something valuable about the user, project, or data patterns
+- Types: fact (objective information), preference (user choices), pattern (recurring themes), insight (analytical conclusions)
+- Memories are searchable and persist across conversations
+
+### 7. 💭 recallMemory
+- Search and retrieve relevant memories from past conversations
+- Use semantic search to find related information you've learned before
+- Helps provide context-aware responses based on conversation history
+- Query by content, filter by memory type` : ''}
+
+${enableWebSearch && isPerplexityEnabled() ? `### External Tools
+
+### ${enableMemory && isMemoryEnabled() ? '8' : '6'}. 🌐 searchWeb
 - Search the web using Perplexity AI for external information
 - Returns answers with citations from reliable sources
 - Use when project data doesn't contain the needed information
 - Limited to 3 searches per conversation
 - **ONLY use when user explicitly asks for external/web information OR project data is insufficient**` : ''}
 
-${isEmailEnabled() ? `### 7. 📧 sendEmail
+${enableEmail && isEmailEnabled() ? `### ${(enableWebSearch && isPerplexityEnabled()) && (enableMemory && isMemoryEnabled()) ? '9' : (enableMemory && isMemoryEnabled()) || (enableWebSearch && isPerplexityEnabled()) ? '7' : '6'}. 📧 sendEmail
 - Send emails with analysis results or summaries
 - Requires explicit user confirmation before sending
 - Use when user requests to share or send information via email` : ''}
@@ -746,7 +778,7 @@ Never end your response immediately after tool calls. Always synthesize and pres
             return result;
           },
         }),
-        ...(isPerplexityEnabled() ? {
+        ...(enableWebSearch && isPerplexityEnabled() ? {
           searchWeb: tool({
             description: 'Search the web using Perplexity AI for external information. Returns answers with citations. Use only when project data is insufficient or user explicitly requests external info.',
             inputSchema: z.object({
@@ -796,7 +828,7 @@ Never end your response immediately after tool calls. Always synthesize and pres
             },
           })
         } : {}),
-        ...(isEmailEnabled() ? {
+        ...(enableEmail && isEmailEnabled() ? {
           sendEmail: tool({
             description: 'Send an email with analysis results or summaries. Use when user requests to share or send information via email. Note: Email sending requires explicit confirmation.',
             inputSchema: z.object({
@@ -842,6 +874,142 @@ Never end your response immediately after tool calls. Always synthesize and pres
                   step: stepCounter,
                   tool: 'sendEmail',
                   input: { to, subject },
+                  output: errorResult,
+                  duration: Date.now() - startTime,
+                  timestamp: new Date()
+                });
+
+                return errorResult;
+              }
+            },
+          })
+        } : {}),
+        ...(enableMemory && isMemoryEnabled() ? {
+          rememberContext: tool({
+            description: 'Store important information, facts, preferences, or insights for future reference. Use when you learn something valuable that should be remembered.',
+            inputSchema: z.object({
+              content: z.string().describe('The information to remember'),
+              type: z.enum(['fact', 'preference', 'pattern', 'insight']).describe('Type of memory'),
+              tags: z.array(z.string()).optional().describe('Tags to categorize this memory'),
+            }),
+            execute: async ({ content, type, tags }) => {
+              stepCounter++;
+              const startTime = Date.now();
+
+              console.log('Tool call: rememberContext with type:', type);
+
+              try {
+                const db = await getDb();
+                const memoryId = await storeMemory(db, {
+                  projectId,
+                  sessionId,
+                  type: type as MemoryType,
+                  content,
+                  source: 'agent',
+                  confidence: 0.9,
+                  tags: tags || [],
+                });
+
+                const result = JSON.stringify({
+                  success: !!memoryId,
+                  memoryId: memoryId?.toString(),
+                  message: memoryId
+                    ? 'Memory stored successfully'
+                    : 'Failed to store memory',
+                });
+
+                toolExecutions.push({
+                  step: stepCounter,
+                  tool: 'rememberContext',
+                  input: { content: content.substring(0, 200), type, tags },
+                  output: result,
+                  duration: Date.now() - startTime,
+                  timestamp: new Date()
+                });
+
+                return result;
+              } catch (error) {
+                const errorResult = JSON.stringify({
+                  success: false,
+                  error: error instanceof Error ? error.message : 'Failed to store memory'
+                });
+
+                toolExecutions.push({
+                  step: stepCounter,
+                  tool: 'rememberContext',
+                  input: { content: content.substring(0, 200), type },
+                  output: errorResult,
+                  duration: Date.now() - startTime,
+                  timestamp: new Date()
+                });
+
+                return errorResult;
+              }
+            },
+          }),
+          recallMemory: tool({
+            description: 'Search and retrieve relevant memories from past conversations. Use to find previously learned information.',
+            inputSchema: z.object({
+              query: z.string().describe('What to search for in memories'),
+              limit: z.number().optional().describe('Maximum number of memories to retrieve (default: 5)'),
+              type: z.enum(['fact', 'preference', 'pattern', 'insight']).optional().describe('Filter by memory type'),
+            }),
+            execute: async ({ query, limit, type }) => {
+              stepCounter++;
+              const startTime = Date.now();
+
+              console.log('Tool call: recallMemory with query:', query);
+
+              try {
+                const db = await getDb();
+                const memories = await retrieveMemories(db, {
+                  projectId,
+                  query,
+                  limit: limit || 5,
+                  type: type as MemoryType | undefined,
+                  minConfidence: 0.6,
+                });
+
+                // Update access count for retrieved memories
+                for (const mem of memories) {
+                  if (mem.memory._id) {
+                    await updateMemoryAccess(db, mem.memory._id.toString());
+                  }
+                }
+
+                const result = JSON.stringify({
+                  found: memories.length,
+                  memories: memories.map(m => ({
+                    content: m.memory.content,
+                    type: m.memory.type,
+                    confidence: m.memory.metadata.confidence,
+                    score: m.score,
+                    tags: m.memory.tags,
+                    source: m.memory.metadata.source,
+                  })),
+                });
+
+                toolExecutions.push({
+                  step: stepCounter,
+                  tool: 'recallMemory',
+                  input: { query, limit, type },
+                  output: result,
+                  duration: Date.now() - startTime,
+                  timestamp: new Date()
+                });
+
+                return result;
+              } catch (error) {
+                const errorResult = JSON.stringify({
+                  found: 0,
+                  memories: [],
+                  error: error instanceof Error ? error.message : 'Failed to recall memories'
+                });
+
+                toolExecutions.push({
+                  step: stepCounter,
+                  tool: 'recallMemory',
+                  input: { query, limit, type },
                   output: errorResult,
                   duration: Date.now() - startTime,
                   timestamp: new Date()

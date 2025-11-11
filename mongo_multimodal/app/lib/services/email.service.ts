@@ -1,7 +1,9 @@
 /**
  * Email Service
- * Handles email sending using Resend API
+ * Handles email sending using Gmail SMTP via nodemailer
  */
+
+import nodemailer from 'nodemailer';
 
 export interface EmailPayload {
   to: string;
@@ -17,18 +19,18 @@ export interface EmailResult {
 }
 
 /**
- * Send an email using Resend API
+ * Send an email using Gmail SMTP via nodemailer
  * @param payload - Email details
  * @returns Result with success status and message ID
  */
 export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
-  const apiKey = process.env.EMAIL_API_KEY;
-  const defaultFrom = process.env.EMAIL_FROM || 'noreply@example.com';
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
 
-  if (!apiKey) {
+  if (!gmailUser || !gmailAppPassword) {
     return {
       success: false,
-      error: 'EMAIL_API_KEY is not configured',
+      error: 'GMAIL_USER and GMAIL_APP_PASSWORD must be configured',
     };
   }
 
@@ -49,34 +51,29 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
   }
 
   try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+    // Create transporter with Gmail SMTP
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: gmailUser,
+        pass: gmailAppPassword,
       },
-      body: JSON.stringify({
-        from: payload.from || defaultFrom,
-        to: [payload.to],
-        subject: payload.subject,
-        html: convertMarkdownToHtml(payload.body),
-        text: payload.body, // Include plain text version
-      }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      return {
-        success: false,
-        error: `Email API error (${response.status}): ${errorData.error || errorData.message || 'Unknown error'}`,
-      };
-    }
-
-    const data = await response.json();
+    // Send email
+    const info = await transporter.sendMail({
+      from: payload.from || gmailUser,
+      to: payload.to,
+      subject: payload.subject,
+      text: payload.body,
+      html: convertMarkdownToHtml(payload.body),
+    });
 
     return {
       success: true,
-      messageId: data.id,
+      messageId: info.messageId,
     };
   } catch (error) {
     console.error('Email send error:', error);
@@ -91,7 +88,7 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
  * Check if email functionality is enabled
  */
 export function isEmailEnabled(): boolean {
-  return !!process.env.EMAIL_API_KEY && process.env.EMAIL_ENABLED !== 'false';
+  return !!process.env.GMAIL_USER && !!process.env.GMAIL_APP_PASSWORD && process.env.EMAIL_ENABLED !== 'false';
 }
 
 /**

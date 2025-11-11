@@ -210,10 +210,16 @@ LLM_FOR_ANALYSIS=claude         # "claude" or "openai" - controls which provider
 # Agent External Tools (Optional)
 PERPLEXITY_API_KEY=...          # For web search in agent mode
 AGENT_WEB_SEARCH_ENABLED=true   # Enable/disable web search tool
-EMAIL_API_KEY=...               # Resend API key for email sending
-EMAIL_FROM=noreply@domain.com   # From address for emails
-EMAIL_ENABLED=true              # Enable/disable email tool
+
+# Gmail SMTP (replaces Resend)
+GMAIL_USER=your-email@workspace.com       # Gmail workspace email
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx    # 16-character app password from Google
+EMAIL_ENABLED=true                        # Enable/disable email tool
+
+# Agent Features
 AGENT_PLANNING_ENABLED=true     # Enable/disable planning phase (recommended: true)
+AGENT_MEMORY_ENABLED=true       # Enable/disable memory system (recommended: true)
+MULTI_AGENT_ENABLED=true        # Enable/disable multi-agent coordination
 
 # Optional: LangSmith tracing for agent mode
 LANGCHAIN_TRACING_V2=true
@@ -556,3 +562,305 @@ The agent is now instructed to:
 - **HMR Safety**: MongoDB client uses global caching in development to prevent connection pool exhaustion
 - **Reference Tracking**: Non-blocking - failures don't affect main conversation flow
 - **Tool Execution Tracking**: Minimal overhead (~1-2ms per tool call)
+
+---
+
+## Advanced Features
+
+### Gmail Email Integration
+
+The application now uses Gmail SMTP via nodemailer instead of Resend for email functionality.
+
+**Setup Requirements:**
+1. Enable 2-Step Verification on your Google Workspace account
+2. Generate an App Password:
+   - Go to Google Account → Security → 2-Step Verification
+   - Scroll to bottom and click "App passwords"
+   - Create app password for "Mail"
+   - Copy the 16-character password
+3. Add to `.env.local`:
+   ```bash
+   GMAIL_USER=your-email@workspace.com
+   GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+   EMAIL_ENABLED=true
+   ```
+
+**Benefits:**
+- No third-party API costs (Resend replacement)
+- Direct Gmail workspace integration
+- Better deliverability and control
+- Full SMTP functionality
+
+**Implementation:**
+- Service: `/app/lib/services/email.service.ts`
+- Uses nodemailer with Gmail SMTP (smtp.gmail.com:587)
+- Supports HTML email with markdown conversion
+- Validation and error handling included
+
+### Agent Memory System
+
+Persistent memory layer that enables agents to remember context across conversations.
+
+**Key Features:**
+- **Semantic Search**: Memories are stored with vector embeddings for intelligent retrieval
+- **Memory Types**:
+  - `fact`: Objective information from project data
+  - `preference`: User choices and patterns
+  - `pattern`: Recurring themes in queries
+  - `insight`: Analytical conclusions
+- **Automatic Management**: Low-value memories pruned based on access patterns
+- **Context Injection**: Relevant memories automatically added to agent prompts
+
+**Database Schema:**
+```typescript
+// agentMemories collection
+{
+  _id: ObjectId,
+  projectId: ObjectId,
+  sessionId: string,
+  type: 'fact' | 'preference' | 'pattern' | 'insight',
+  content: string,
+  embedding: number[],  // 1024-dim vector for search
+  metadata: {
+    source: string,
+    confidence: number,  // 0-1 score
+    accessCount: number,
+    lastAccessed: Date
+  },
+  relatedMemories: ObjectId[],
+  createdAt: Date,
+  expiresAt?: Date,
+  tags: string[]
+}
+```
+
+**New Agent Tools:**
+1. **rememberContext** - Store important information
+   ```typescript
+   {
+     content: "User prefers detailed analysis",
+     type: "preference",
+     tags: ["user-behavior"]
+   }
+   ```
+
+2. **recallMemory** - Retrieve relevant memories
+   ```typescript
+   {
+     query: "user preferences for analysis",
+     limit: 5,
+     type: "preference"  // optional filter
+   }
+   ```
+
+**API Functions:**
+- `storeMemory()` - Save with automatic embedding generation
+- `retrieveMemories()` - Semantic search over memories
+- `getMemoryContext()` - Build context string for prompts
+- `pruneMemories()` - Clean up low-value memories
+- `extractMemoriesFromConversation()` - Auto-extract from conversations
+
+**Configuration:**
+```bash
+AGENT_MEMORY_ENABLED=true  # Enable/disable memory system
+```
+
+### Multi-Agent Collaboration Framework
+
+Advanced orchestration system with specialized agents working together.
+
+**Architecture:**
+
+```
+User Query
+    ↓
+Coordinator Agent (orchestrates)
+    ↓
+┌─────────┬──────────┬─────────┬───────────┐
+Search    Analysis   Memory    Synthesis
+Agent     Agent      Agent     Agent
+└─────────┴──────────┴─────────┴───────────┘
+    ↓
+Combined Result → User
+```
+
+**Agent Types:**
+
+1. **Coordinator Agent** (`coordinator.agent.ts`)
+   - Master orchestrator
+   - Creates multi-agent execution plans
+   - Delegates tasks to specialists
+   - Manages agent communication
+   - Synthesizes final response
+
+2. **Search Agent** (`search.agent.ts`)
+   - Information retrieval specialist
+   - Vector search optimization
+   - Similar items discovery
+   - Web search integration (when enabled)
+
+3. **Analysis Agent** (`analysis.agent.ts`)
+   - Deep content analysis
+   - Image analysis with context awareness
+   - Comparative analysis
+   - Fetches stored analyses
+
+4. **Memory Agent** (`memory.agent.ts`)
+   - Memory storage and retrieval
+   - Context management
+   - Pattern analysis
+   - Memory linking
+
+5. **Synthesis Agent** (`synthesis.agent.ts`)
+   - Combines multi-agent results
+   - Report generation
+   - Summary creation
+   - Markdown formatting
+
+**Communication Protocol:**
+```typescript
+interface AgentMessage {
+  from: AgentType,
+  to: AgentType,
+  messageId: string,
+  conversationId: string,
+  type: 'request' | 'response' | 'update' | 'error',
+  payload: {
+    task: string,
+    data?: any,
+    context?: string,
+    priority?: 'low' | 'medium' | 'high' | 'critical'
+  },
+  timestamp: Date
+}
+```
+
+**Database Schema:**
+```typescript
+// agentConversations collection
+{
+  _id: ObjectId,
+  projectId: ObjectId,
+  sessionId: string,
+  userQuery: string,
+  coordinatorPlan: {
+    strategy: string,
+    agentsInvolved: AgentType[],
+    estimatedSteps: number,
+    taskBreakdown: Array<{
+      agent: AgentType,
+      task: string,
+      priority: Priority,
+      dependencies?: AgentType[]
+    }>
+  },
+  agentMessages: AgentMessage[],
+  agentResults: {
+    [agentType: string]: {
+      status: 'pending' | 'completed' | 'failed',
+      output: any,
+      duration: number,
+      tokensUsed?: number
+    }
+  },
+  finalResponse: string,
+  totalDuration: number,
+  createdAt: Date
+}
+```
+
+**API Endpoints:**
+
+**POST `/api/multi-agent`** - Execute multi-agent workflow
+```typescript
+Request: {
+  message: string,
+  projectId: string,
+  sessionId?: string,
+  selectedDataIds?: string[]
+}
+
+Response: {
+  success: boolean,
+  conversationId: string,
+  plan: CoordinatorPlan,
+  agentResults: Array<{
+    agent: AgentType,
+    success: boolean,
+    data: any
+  }>,
+  synthesis: string,
+  executionTime: number,
+  metadata: {
+    agentsUsed: AgentType[],
+    totalSteps: number
+  }
+}
+```
+
+**GET `/api/multi-agent?projectId={id}&limit={n}`** - Get conversation history
+```typescript
+Response: {
+  conversations: Array<{
+    id: string,
+    userQuery: string,
+    agentsInvolved: AgentType[],
+    totalDuration: number,
+    createdAt: Date,
+    success: boolean
+  }>
+}
+```
+
+**Usage Example:**
+```typescript
+// Multi-agent query
+const response = await fetch('/api/multi-agent', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    message: 'Compare Q1 and Q2 revenue and explain the trend',
+    projectId: 'abc123',
+    selectedDataIds: ['item1', 'item2']
+  })
+});
+
+const result = await response.json();
+console.log(result.plan);        // Coordinator's strategy
+console.log(result.agentResults); // Each agent's contribution
+console.log(result.synthesis);    // Final combined answer
+```
+
+**Benefits:**
+- **Specialized Expertise**: Each agent focuses on specific tasks
+- **Parallel Processing**: Agents can work independently
+- **Better Decomposition**: Complex tasks broken into manageable subtasks
+- **Transparency**: Full visibility into agent collaboration
+- **Educational Value**: Demonstrates advanced AI orchestration patterns
+
+**Coordination Service:**
+- Message routing between agents
+- State management for multi-agent workflows
+- Performance analytics and monitoring
+- Conversation persistence
+
+**Configuration:**
+```bash
+MULTI_AGENT_ENABLED=true  # Enable/disable multi-agent system
+```
+
+**Key Files:**
+- `/app/lib/agents/` - All agent implementations
+- `/app/lib/services/coordination.service.ts` - Coordination logic
+- `/app/api/multi-agent/route.ts` - API endpoint
+- `/app/types/agent.types.ts` - Type definitions
+
+---
+
+## New Collections
+
+### agentMemories
+Stores persistent agent memories with vector embeddings for semantic search.
+
+### agentConversations
+Records multi-agent collaboration sessions with full message history and results.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { X, Download, Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ClientProjectData } from '@/types/clientTypes';
 
@@ -16,6 +16,7 @@ export function ImagePreviewModal({ dataId, projectId, onClose, allItems }: Imag
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!dataId) {
@@ -23,15 +24,31 @@ export function ImagePreviewModal({ dataId, projectId, onClose, allItems }: Imag
       return;
     }
 
+    // Reset zoom when switching images
+    setZoom(1);
+
     const fetchItem = async () => {
       setLoading(true);
       setError(null);
       setItem(null); // Clear previous item when fetching new one
+
+      // Scroll to top immediately when starting to load
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
+
       try {
         const response = await fetch(`/api/projects/data/${dataId}/content`);
         if (!response.ok) throw new Error('Failed to fetch item');
         const data = await response.json();
         setItem(data);
+
+        // Scroll to top again after content loads
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = 0;
+          }
+        }, 0);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load image');
       } finally {
@@ -200,13 +217,16 @@ export function ImagePreviewModal({ dataId, projectId, onClose, allItems }: Imag
 
             {/* Content */}
             <div className="bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: '400px' }}>
-              <div className="overflow-auto max-h-[80vh] w-full flex items-center justify-center p-4">
+              <div
+                ref={scrollContainerRef}
+                className="overflow-auto max-h-[80vh] w-full flex items-start justify-center p-4 pt-20 pb-20"
+              >
                 {item.type === 'image' && item.content.base64 ? (
                   <img
                     src={`data:${item.metadata.mimeType};base64,${item.content.base64}`}
                     alt={item.metadata.filename}
                     className="max-w-full h-auto transition-transform"
-                    style={{ transform: `scale(${zoom})` }}
+                    style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
                   />
                 ) : (
                   <div className="text-white p-8 text-center">

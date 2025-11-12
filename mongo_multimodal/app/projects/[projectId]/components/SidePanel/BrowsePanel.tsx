@@ -20,8 +20,10 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
   const [analyzingItems, setAnalyzingItems] = useState<Set<string>>(new Set());
+  const [isBulkAnalyzing, setIsBulkAnalyzing] = useState(false);
+  const [isBulkEmbedding, setIsBulkEmbedding] = useState(false);
 
-  const { toggleItem, isSelected } = useSelection();
+  const { toggleItem, isSelected, selectedItems, clearSelection } = useSelection();
   const observer = useRef<IntersectionObserver | null>(null);
 
   // Filter data based on toggles
@@ -147,6 +149,74 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
     }
   };
 
+  const handleBulkAnalyze = async () => {
+    const selectedIds = Array.from(selectedItems).map(item => item._id);
+    if (selectedIds.length === 0) {
+      alert('Please select at least one item to analyze');
+      return;
+    }
+
+    setIsBulkAnalyzing(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/data/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to bulk analyze');
+      }
+
+      // Refresh the data
+      if (onDataUpdate) {
+        onDataUpdate();
+      }
+
+      clearSelection();
+    } catch (error) {
+      console.error('Error bulk analyzing:', error);
+      alert(error instanceof Error ? error.message : 'Failed to bulk analyze items');
+    } finally {
+      setIsBulkAnalyzing(false);
+    }
+  };
+
+  const handleBulkEmbed = async () => {
+    const selectedIds = Array.from(selectedItems).map(item => item._id);
+    if (selectedIds.length === 0) {
+      alert('Please select at least one item to embed');
+      return;
+    }
+
+    setIsBulkEmbedding(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/data/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to bulk embed');
+      }
+
+      // Refresh the data
+      if (onDataUpdate) {
+        onDataUpdate();
+      }
+
+      clearSelection();
+    } catch (error) {
+      console.error('Error bulk embedding:', error);
+      alert(error instanceof Error ? error.message : 'Failed to bulk embed items');
+    } finally {
+      setIsBulkEmbedding(false);
+    }
+  };
+
   return (
     <div className="p-4 space-y-4">
       {/* Header */}
@@ -200,6 +270,44 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
               className="text-xs text-[#13AA52] dark:text-[#00ED64] hover:underline"
             >
               {allSelected ? 'Deselect all' : 'Select all'}
+            </button>
+          </div>
+        )}
+
+        {/* Bulk Action Buttons */}
+        {selectedCount > 0 && (
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={handleBulkAnalyze}
+              disabled={isBulkAnalyzing}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium
+                       bg-green-100 dark:bg-green-900/30 text-[#00684A] dark:text-[#00ED64]
+                       rounded-md hover:bg-green-200 dark:hover:bg-green-900/50
+                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title={`Analyze ${selectedCount} selected items`}
+            >
+              {isBulkAnalyzing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Brain className="w-3.5 h-3.5" />
+              )}
+              {isBulkAnalyzing ? 'Analyzing...' : `Analyze ${selectedCount}`}
+            </button>
+            <button
+              onClick={handleBulkEmbed}
+              disabled={isBulkEmbedding}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium
+                       bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400
+                       rounded-md hover:bg-purple-200 dark:hover:bg-purple-900/50
+                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title={`Embed ${selectedCount} selected items`}
+            >
+              {isBulkEmbedding ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              {isBulkEmbedding ? 'Embedding...' : `Embed ${selectedCount}`}
             </button>
           </div>
         )}
@@ -333,7 +441,7 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
                       </button>
                     )}
 
-                    {!hasEmbedding && hasAnalysis && (
+                    {!hasEmbedding && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -352,12 +460,6 @@ export function BrowsePanel({ projectId, projectData, onDataUpdate }: BrowsePane
                         )}
                         {processingItems.has(item._id) ? 'Embedding...' : 'Embed'}
                       </button>
-                    )}
-
-                    {!hasEmbedding && !hasAnalysis && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400 italic">
-                        Analyze first, then embed
-                      </span>
                     )}
                   </div>
                 </div>

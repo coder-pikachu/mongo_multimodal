@@ -41,46 +41,50 @@ export function PlanCard({ plan, currentStep, totalSteps, availableTools }: Plan
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
-    <div className="border border-green-200 dark:border-green-800 rounded-lg bg-green-50 dark:bg-green-900/20 overflow-hidden">
+    <div className="border border-primary-200 dark:border-primary-800 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100/50 dark:from-primary-900/20 dark:to-primary-800/10 overflow-hidden shadow-sm hover:shadow-md transition-shadow animate-scale-in">
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+        className="w-full px-5 py-4 flex items-center justify-between hover:bg-primary-100/50 dark:hover:bg-primary-900/30 transition-all duration-200 group"
+        aria-expanded={isExpanded}
+        aria-label={isExpanded ? 'Collapse plan' : 'Expand plan'}
       >
-        <div className="flex items-center gap-2">
-          <List className="w-4 h-4 text-[#13AA52] dark:text-[#00ED64]" />
-          <span className="font-medium text-sm text-[#00684A] dark:text-[#00ED64]">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary-500/10 dark:bg-primary-500/20 group-hover:bg-primary-500/20 dark:group-hover:bg-primary-500/30 transition-colors">
+            <List className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+          </div>
+          <span className="font-semibold text-base text-primary-700 dark:text-primary-300">
             Agent Plan
           </span>
           {currentStep !== undefined && totalSteps !== undefined && (
-            <span className="text-xs text-[#13AA52] dark:text-[#00ED64]">
-              (Step {currentStep} of {totalSteps})
+            <span className="px-2.5 py-1 text-xs font-medium bg-primary-200 dark:bg-primary-800 text-primary-700 dark:text-primary-300 rounded-full">
+              Step {currentStep} / {totalSteps}
             </span>
           )}
         </div>
         {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-[#13AA52] dark:text-[#00ED64]" />
+          <ChevronUp className="w-5 h-5 text-primary-600 dark:text-primary-400 transition-transform group-hover:scale-110" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-[#13AA52] dark:text-[#00ED64]" />
+          <ChevronDown className="w-5 h-5 text-primary-600 dark:text-primary-400 transition-transform group-hover:scale-110" />
         )}
       </button>
 
       {/* Content */}
       {isExpanded && (
-        <div className="px-4 pb-4 space-y-3">
+        <div className="px-5 pb-5 space-y-4 animate-fade-in">
           {/* Rationale */}
-          <div>
-            <p className="text-sm text-[#00684A] dark:text-[#00ED64]">
+          <div className="p-3 rounded-lg bg-white/50 dark:bg-neutral-900/20 border border-primary-200/50 dark:border-primary-800/50">
+            <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
               {plan.rationale}
             </p>
           </div>
 
           {/* Steps */}
           <div>
-            <h4 className="text-xs font-semibold text-[#13AA52] dark:text-[#00ED64] mb-2">
-              Steps:
+            <h4 className="text-xs font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400 mb-3">
+              Execution Steps
             </h4>
-            <ol className="space-y-2">
+            <ol className="space-y-2.5">
               {plan.steps.map((step, index) => {
                 const isComplete = currentStep !== undefined && index < currentStep;
                 const isCurrent = currentStep !== undefined && index === currentStep;
@@ -88,22 +92,28 @@ export function PlanCard({ plan, currentStep, totalSteps, availableTools }: Plan
                 return (
                   <li
                     key={index}
-                    className={`flex items-start gap-2 text-sm ${
+                    className={`flex items-start gap-3 text-sm transition-all duration-200 ${
                       isComplete
-                        ? 'text-green-700 dark:text-green-400'
+                        ? 'text-success-700 dark:text-success-400'
                         : isCurrent
-                        ? 'text-[#00684A] dark:text-[#00ED64] font-medium'
-                        : 'text-[#13AA52] dark:text-[#00ED64]/80'
+                        ? 'text-primary-700 dark:text-primary-300 font-medium scale-105'
+                        : 'text-neutral-600 dark:text-neutral-400'
                     }`}
                   >
                     {isComplete ? (
-                      <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
+                      <div className="p-1 rounded-full bg-success-100 dark:bg-success-900/30">
+                        <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-success-600 dark:text-success-400" />
+                      </div>
                     ) : (
-                      <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-xs font-medium mt-0.5">
-                        {index + 1}.
+                      <span className={`w-6 h-6 flex items-center justify-center flex-shrink-0 text-xs font-bold rounded-full ${
+                        isCurrent
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+                      }`}>
+                        {index + 1}
                       </span>
                     )}
-                    <span>{step}</span>
+                    <span className="pt-0.5">{step}</span>
                   </li>
                 );
               })}
@@ -111,15 +121,15 @@ export function PlanCard({ plan, currentStep, totalSteps, availableTools }: Plan
           </div>
 
           {/* Tools and Stats */}
-          <div className="flex items-center gap-4 pt-2 border-t border-green-200 dark:border-green-800">
-            <div className="flex items-center gap-1 text-xs text-[#13AA52] dark:text-[#00ED64]">
-              <Clock className="w-3 h-3" />
+          <div className="flex items-center gap-4 pt-3 border-t border-primary-200/50 dark:border-primary-800/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-primary-700 dark:text-primary-300 px-3 py-1.5 rounded-full bg-primary-100 dark:bg-primary-900/30">
+              <Clock className="w-3.5 h-3.5" />
               <span>~{plan.estimatedToolCalls} tool calls</span>
             </div>
             {plan.needsExternalData && (
-              <div className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400">
-                <span className="w-2 h-2 bg-orange-500 rounded-full" />
-                <span>Needs external data</span>
+              <div className="flex items-center gap-2 text-xs font-medium text-accent-orange-700 dark:text-accent-orange-400 px-3 py-1.5 rounded-full bg-accent-orange-100 dark:bg-accent-orange-900/30">
+                <span className="w-2 h-2 bg-accent-orange-500 rounded-full animate-pulse" />
+                <span>External data required</span>
               </div>
             )}
           </div>
@@ -129,8 +139,8 @@ export function PlanCard({ plan, currentStep, totalSteps, availableTools }: Plan
             {/* Available Tools */}
             {availableTools && availableTools.length > 0 && (
               <div>
-                <h4 className="text-xs font-semibold text-[#13AA52] dark:text-[#00ED64] mb-2">
-                  Available Tools:
+                <h4 className="text-xs font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400 mb-3">
+                  Tool Selection
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {availableTools.map((tool, index) => {
@@ -138,12 +148,12 @@ export function PlanCard({ plan, currentStep, totalSteps, availableTools }: Plan
                     return (
                       <div
                         key={index}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs transition-all ${
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                           isSelected
-                            ? 'bg-green-200 dark:bg-green-800 text-[#00684A] dark:text-[#00ED64] font-medium border border-green-300 dark:border-green-700'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 opacity-60'
+                            ? 'bg-primary-200 dark:bg-primary-800 text-primary-800 dark:text-primary-200 border border-primary-300 dark:border-primary-700 shadow-sm'
+                            : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-500 opacity-50 border border-transparent'
                         }`}
-                        title={isSelected ? `Selected for use` : `Available but not selected`}
+                        title={isSelected ? `Selected for execution` : `Available but not selected`}
                       >
                         {getToolIcon(tool)}
                         <span>{tool}</span>
@@ -157,15 +167,15 @@ export function PlanCard({ plan, currentStep, totalSteps, availableTools }: Plan
             {/* Selected Tools Only (fallback if no availableTools provided) */}
             {!availableTools && plan.toolsToUse && plan.toolsToUse.length > 0 && (
               <div>
-                <h4 className="text-xs font-semibold text-[#13AA52] dark:text-[#00ED64] mb-2">
-                  Tools to Use:
+                <h4 className="text-xs font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400 mb-3">
+                  Selected Tools
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {plan.toolsToUse.map((tool, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-1.5 px-2.5 py-1 bg-green-100 dark:bg-green-900/40 text-xs rounded
-                               text-[#13AA52] dark:text-[#00ED64]"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-primary-100 dark:bg-primary-900/40 text-xs font-medium rounded-lg
+                               text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800"
                     >
                       {getToolIcon(tool)}
                       <span>{tool}</span>

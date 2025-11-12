@@ -4,84 +4,99 @@ import { ArrowRight, FileText, Image as ImageIcon, Search } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-zinc-900 dark:to-zinc-950 text-gray-900 dark:text-white">
+    <div className="min-h-screen bg-gradient-to-b from-neutral-50 via-neutral-100 to-neutral-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 text-neutral-900 dark:text-neutral-50">
       {/* Hero Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
-        <div className="text-center">
-          <div className="flex justify-center mb-8">
-            <Image
-              src="/logo.svg"
-              alt="MongoDB Logo"
-              width={80}
-              height={80}
-              style={{ filter: 'invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%)' }}
-
-              priority
-            />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
+        <div className="text-center animate-fade-in">
+          <div className="flex justify-center mb-8 animate-bounce-subtle">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary-500/20 blur-3xl rounded-full animate-pulse-subtle" />
+              <Image
+                src="/logo.svg"
+                alt="MongoDB Logo"
+                width={96}
+                height={96}
+                style={{ filter: 'invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%)' }}
+                className="relative"
+                priority
+              />
+            </div>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-6xl mb-6 bg-gradient-to-r from-emerald-400 to-blue-500 text-transparent bg-clip-text">
-            AI Research Assistant
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-purple-500 text-transparent bg-clip-text animate-slide-in-up">
+            AI Agent Space
           </h1>
-          <p className="text-xl text-gray-600 dark:text-zinc-400 max-w-3xl mx-auto">
-            An intelligent agent system powered by MongoDB Atlas, Claude AI, and multi-agent collaboration.
+          <p className="text-lg md:text-xl lg:text-2xl text-neutral-600 dark:text-neutral-400 max-w-3xl mx-auto leading-relaxed animate-slide-in-up">
+            An intelligent agent system powered by <span className="font-semibold text-primary-600 dark:text-primary-400">MongoDB Atlas</span>, <span className="font-semibold text-accent-purple-600 dark:text-accent-purple-400">Claude AI</span>, and multi-agent collaboration.
             Upload multimodal content, ask complex questions, and get AI-generated insights with planning and memory.
           </p>
         </div>
       </div>
 
       {/* How It Works */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="text-3xl font-bold mb-4 text-center">How It Works</h2>
-        <p className="text-xl text-gray-600 dark:text-zinc-400 max-w-2xl mx-auto text-center mb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <h2 className="text-4xl md:text-5xl font-bold mb-6 text-center text-neutral-900 dark:text-neutral-50">How It Works</h2>
+        <p className="text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto text-center mb-16 leading-relaxed">
           Create projects, upload multimodal content, and interact with an intelligent AI agent that plans, researches, and synthesizes insights.
         </p>
 
         {/* Process Flow */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
-          <div className="text-center">
-            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-white">1</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+          <div className="text-center group animate-slide-in-up">
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+              <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center mx-auto shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
+                <span className="text-3xl font-black text-white">1</span>
+              </div>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Create Projects</h3>
-            <p className="text-gray-600 dark:text-zinc-400">
+            <h3 className="text-xl font-bold mb-3 text-neutral-900 dark:text-neutral-50">Create Projects</h3>
+            <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed">
               Organize your research into projects with PDFs, images, text files, and web content.
             </p>
           </div>
 
-          <div className="text-center">
-            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-white">2</span>
+          <div className="text-center group animate-slide-in-up" style={{ animationDelay: '0.1s' }}>
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-br from-secondary-500 to-accent-purple-500 rounded-full blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+              <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-secondary-500 to-accent-purple-500 flex items-center justify-center mx-auto shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
+                <span className="text-3xl font-black text-white">2</span>
+              </div>
             </div>
-            <h3 className="text-xl font-semibold mb-2">AI Processing</h3>
-            <p className="text-gray-600 dark:text-zinc-400">
+            <h3 className="text-xl font-bold mb-3 text-neutral-900 dark:text-neutral-50">AI Processing</h3>
+            <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed">
               Content analyzed by Claude AI, chunked intelligently, and vectorized for semantic search.
             </p>
           </div>
 
-          <div className="text-center">
-            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-white">3</span>
+          <div className="text-center group animate-slide-in-up" style={{ animationDelay: '0.2s' }}>
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-br from-accent-purple-500 to-error-500 rounded-full blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+              <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-accent-purple-500 to-error-500 flex items-center justify-center mx-auto shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
+                <span className="text-3xl font-black text-white">3</span>
+              </div>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Agent Planning</h3>
-            <p className="text-gray-600 dark:text-zinc-400">
+            <h3 className="text-xl font-bold mb-3 text-neutral-900 dark:text-neutral-50">Agent Planning</h3>
+            <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed">
               AI agent creates execution plans, breaking down complex queries into actionable steps.
             </p>
           </div>
 
-          <div className="text-center">
-            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 to-red-500 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-white">4</span>
+          <div className="text-center group animate-slide-in-up" style={{ animationDelay: '0.3s' }}>
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-br from-error-500 to-accent-orange-500 rounded-full blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+              <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-error-500 to-accent-orange-500 flex items-center justify-center mx-auto shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
+                <span className="text-3xl font-black text-white">4</span>
+              </div>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Get Insights</h3>
-            <p className="text-gray-600 dark:text-zinc-400">
+            <h3 className="text-xl font-bold mb-3 text-neutral-900 dark:text-neutral-50">Get Insights</h3>
+            <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed">
               Agent searches, analyzes, remembers context, and synthesizes comprehensive answers with citations.
             </p>
           </div>
         </div>
 
         {/* Agent Capabilities Section */}
-        <div className="bg-gray-100/50 dark:bg-zinc-800/30 rounded-2xl p-8 border border-gray-300/50 dark:border-zinc-700/50">
-          <h3 className="text-2xl font-bold mb-6 text-center">AI Agent Capabilities</h3>
+        <div className="bg-gradient-to-br from-neutral-100/80 to-neutral-200/50 dark:from-neutral-800/50 dark:to-neutral-900/30 rounded-3xl p-10 border border-neutral-300/50 dark:border-neutral-700/50 backdrop-blur-sm shadow-xl">
+          <h3 className="text-3xl font-bold mb-8 text-center text-neutral-900 dark:text-neutral-50">AI Agent Capabilities</h3>
           <div className="max-w-4xl mx-auto">
             {/* Sample Agent Queries */}
             <div className="mb-6">
@@ -245,41 +260,41 @@ export default function Home() {
       </div>
 
       {/* CTA Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <h2 className="text-3xl font-bold mb-4">Ready to start researching?</h2>
-        <p className="text-xl text-gray-600 dark:text-zinc-400 mb-8 max-w-2xl mx-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+        <h2 className="text-4xl md:text-5xl font-bold mb-6 text-neutral-900 dark:text-neutral-50">Ready to start researching?</h2>
+        <p className="text-xl text-neutral-600 dark:text-neutral-400 mb-12 max-w-2xl mx-auto leading-relaxed">
           Create projects, upload your content, and let the AI agent help you discover insights with planning, memory, and multi-source analysis.
         </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-center gap-6">
           <Link
             href="/projects"
-            className="inline-flex items-center px-8 py-4 text-lg font-medium rounded-lg text-white bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 transition-all transform hover:scale-105 shadow-lg"
+            className="group inline-flex items-center justify-center px-10 py-5 text-lg font-semibold rounded-2xl text-neutral-900 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-glow-lg"
           >
             Create Your First Project
-            <ArrowRight className="ml-2 h-6 w-6" />
+            <ArrowRight className="ml-3 h-6 w-6 group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link
             href="/search"
-            className="inline-flex items-center px-8 py-4 border border-gray-400 dark:border-zinc-600 text-lg font-medium rounded-lg text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-zinc-800 transition-all transform hover:scale-105"
+            className="group inline-flex items-center justify-center px-10 py-5 border-2 border-neutral-300 dark:border-neutral-700 text-lg font-semibold rounded-2xl text-neutral-900 dark:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
           >
             Try Global Search
-            <Search className="ml-2 h-6 w-6" />
+            <Search className="ml-3 h-6 w-6 group-hover:rotate-12 transition-transform" />
           </Link>
         </div>
 
         {/* Quick stats */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">7 Agent Tools</div>
-            <div className="text-gray-600 dark:text-zinc-400 text-sm">Planning, search, analysis, memory, web, email</div>
+        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100/50 dark:from-primary-900/20 dark:to-primary-800/10 border border-primary-200/50 dark:border-primary-800/50 hover:shadow-lg transition-shadow">
+            <div className="text-3xl font-black text-primary-600 dark:text-primary-400 mb-2">7 Agent Tools</div>
+            <div className="text-neutral-600 dark:text-neutral-400 text-sm font-medium">Planning, search, analysis, memory, web, email</div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">5 Specialized Agents</div>
-            <div className="text-gray-600 dark:text-zinc-400 text-sm">Coordinator, search, analysis, memory, synthesis</div>
+          <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-secondary-50 to-secondary-100/50 dark:from-secondary-900/20 dark:to-secondary-800/10 border border-secondary-200/50 dark:border-secondary-800/50 hover:shadow-lg transition-shadow">
+            <div className="text-3xl font-black text-secondary-600 dark:text-secondary-400 mb-2">5 Specialized Agents</div>
+            <div className="text-neutral-600 dark:text-neutral-400 text-sm font-medium">Coordinator, search, analysis, memory, synthesis</div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">Multimodal</div>
-            <div className="text-gray-600 dark:text-zinc-400 text-sm">PDFs, images, text, web content</div>
+          <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-accent-purple-50 to-accent-purple-100/50 dark:from-accent-purple-900/20 dark:to-accent-purple-800/10 border border-accent-purple-200/50 dark:border-accent-purple-800/50 hover:shadow-lg transition-shadow">
+            <div className="text-3xl font-black text-accent-purple-600 dark:text-accent-purple-400 mb-2">Multimodal</div>
+            <div className="text-neutral-600 dark:text-neutral-400 text-sm font-medium">PDFs, images, text, web content</div>
           </div>
         </div>
       </div>

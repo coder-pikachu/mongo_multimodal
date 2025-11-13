@@ -266,7 +266,7 @@ export async function vectorSearchWithAnalysis(
   const searchResults = results.map(result => ({
     _id: result._id.toString(),
     type: result.type,
-    content: result.content,
+    content: result.content || { text: undefined, base64: undefined },
     metadata: result.metadata,
     analysis: result.analysis,
     createdAt: result.createdAt,

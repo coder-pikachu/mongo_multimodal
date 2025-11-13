@@ -482,11 +482,14 @@ ${enableMemory && isMemoryEnabled() ? `### Memory Tools
 ${enableWebSearch && isPerplexityEnabled() ? `### External Tools
 
 ### ${enableMemory && isMemoryEnabled() ? '8' : '6'}. 🌐 searchWeb
-- Search the web using Perplexity AI for external information
+- Search the web using Perplexity AI for external information and real-time data
 - Returns answers with citations from reliable sources
-- Use when project data doesn't contain the needed information
-- Limited to 3 searches per conversation
-- **ONLY use when user explicitly asks for external/web information OR project data is insufficient**` : ''}
+- Use when:
+  - User explicitly requests external/web information
+  - Project data doesn't contain sufficient information for the query
+  - You need current events, latest updates, or information beyond the project scope
+  - Comparing project data with external benchmarks or standards
+- Returns structured answers with source citations` : ''}
 
 ${enableEmail && isEmailEnabled() ? `### ${(enableWebSearch && isPerplexityEnabled()) && (enableMemory && isMemoryEnabled()) ? '9' : (enableMemory && isMemoryEnabled()) || (enableWebSearch && isPerplexityEnabled()) ? '7' : '6'}. 📧 sendEmail
 - Send emails with analysis results or summaries
@@ -494,7 +497,9 @@ ${enableEmail && isEmailEnabled() ? `### ${(enableWebSearch && isPerplexityEnabl
 - Use when user requests to share or send information via email` : ''}
 
 ## CRITICAL: Data Source Constraints
-**YOU MUST ONLY USE INFORMATION FROM THE PROJECT DATA VIA YOUR TOOLS.**
+**Primary Rule: Use project data as your main source via your tools.**${enableWebSearch && isPerplexityEnabled() ? `
+**Secondary Rule: When web search is enabled and you cannot find sufficient information in project data, you MAY use the searchWeb tool to supplement your answer. Always prioritize project data first.**` : `
+**YOU MUST ONLY USE INFORMATION FROM THE PROJECT DATA. Do not use external knowledge.**`}
 
 The project includes:
 - **Images** (JPEG, PNG) - Analyzed with context-awareness
@@ -574,9 +579,10 @@ General approach:
 4. Decompose ambiguous queries into concrete sub-queries (as shown in your plan)
 5. Prefer focused searches that answer the question directly over exhaustive exploration
 6. Keep each tool call scoped; for project search, default to 2 results (adjust maxResults if needed)
-7. **If tools return no results**, try 1-2 alternative search terms, then conclude if step budget is tight
+7. **If tools return no results**, try 1-2 alternative search terms${enableWebSearch && isPerplexityEnabled() ? `, then use searchWeb if project data is truly insufficient` : `, then conclude if step budget is tight`}
 8. **Monitor your step usage**: After each tool call, consider if you should gather more data or synthesize now
-9. **Adapt if needed**: If your plan isn't working, it's okay to adjust - just note the change in your synthesis
+9. **Adapt if needed**: If your plan isn't working, it's okay to adjust - just note the change in your synthesis${enableWebSearch && isPerplexityEnabled() ? `
+10. **Web search fallback**: If project searches fail to find relevant information, use searchWeb to supplement your answer with external data` : ``}
 
 ## Response Format
 Keep responses concise, solution-focused, and beautifully formatted in Markdown:
@@ -597,18 +603,21 @@ Keep responses concise, solution-focused, and beautifully formatted in Markdown:
 ## Error Handling
 When a tool fails or returns no results:
 1. **Try immediately** with different parameters or search terms (2-3 attempts)
-2. **Search for related data** that might contain the answer, be creative with the search terms
+2. **Search for related data** that might contain the answer, be creative with the search terms${enableWebSearch && isPerplexityEnabled() ? `
+3. **Use searchWeb**: If project data truly doesn't contain the information, use the searchWeb tool to find external answers
+4. **Be direct** about what you found vs. what you couldn't find - cite which sources (project vs web) provided the information
+5. **State limitations clearly**: "I searched the project for [X, Y, Z] but found no relevant data. However, web search revealed..."` : `
 3. **Be direct** about what you found vs. what you couldn't find in the project data
 4. **State limitations clearly**: "I searched the project for [X, Y, Z] but no relevant data was found"
-5. **Don't provide general knowledge** - if it's not in the project, say so
+5. **Don't provide general knowledge** - if it's not in the project, say so`}
 
 ## CRITICAL: Final Response Requirement
 After using tools (search, analyze, etc.), you MUST provide a comprehensive synthesized answer that:
-1. **Directly answers** the user's question using ONLY information gathered from tools
+1. **Directly answers** the user's question using ONLY information gathered from tools${enableWebSearch && isPerplexityEnabled() ? ` (project data AND web search results)` : ``}
 2. **Integrates findings** from all tool calls into a coherent response
 3. **Uses proper markdown formatting** with headers, bullets, and emphasis
-4. **Cites specific sources** (filenames, data points) from your tool results
-5. **Clearly states** if information wasn't found: "I couldn't find data about [X] in this project"
+4. **Cites specific sources** (filenames, data points${enableWebSearch && isPerplexityEnabled() ? `, web citations` : ``}) from your tool results
+5. **Clearly states** if information wasn't found: ${enableWebSearch && isPerplexityEnabled() ? `"I couldn't find data about [X] in this project, but web search found..."` : `"I couldn't find data about [X] in this project"`}
 
 Never end your response immediately after tool calls. Always synthesize and present your findings to the user.`,
       messages: messages.slice(-10),
@@ -788,7 +797,7 @@ Never end your response immediately after tool calls. Always synthesize and pres
         }),
         ...(enableWebSearch && isPerplexityEnabled() ? {
           searchWeb: tool({
-            description: 'Search the web using Perplexity AI for external information. Returns answers with citations. Use only when project data is insufficient or user explicitly requests external info.',
+            description: 'Search the web using Perplexity AI for external information and real-time data. Returns answers with citations from reliable sources. Use when user requests web info, project data is insufficient, or you need current events/benchmarks.',
             inputSchema: z.object({
               query: z.string().describe('The web search query'),
             }),

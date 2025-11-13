@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { CheckSquare, Square, FileText, Image as ImageIcon, Eye, Loader2, Brain, Sparkles } from 'lucide-react';
-import { ClientProjectData } from '@/app/types/clientTypes';
+import { ClientProjectData } from '@/types/clientTypes';
 import { useSelection } from '../SelectionContext';
 import { ImagePreviewModal } from '../ImagePreviewModal';
 

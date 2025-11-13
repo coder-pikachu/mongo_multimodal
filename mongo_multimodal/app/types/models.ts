@@ -50,6 +50,7 @@ export interface ProjectData {
   };
   embedding?: number[]; // 1024-dimensional vector
   referencedBy?: Reference[]; // Track where this data was used
+  score?: number; // Similarity score from vector search (0-1)
   createdAt: Date;
   updatedAt: Date;
 }

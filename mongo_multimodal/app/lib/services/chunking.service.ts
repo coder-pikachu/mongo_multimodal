@@ -88,7 +88,7 @@ export async function processAndUploadTextFile(
             totalChunks: chunk.totalChunks,
             parentId,
             originalFilename: file.name,
-            csvMetadata: chunk.metadata.csvMetadata,
+            csvMetadata: chunk.metadata.csvMetadata || undefined,
           },
         },
         analysis: {

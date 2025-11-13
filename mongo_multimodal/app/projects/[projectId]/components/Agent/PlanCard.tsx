@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, CheckCircle2, Clock, List, Search, Link, Eye, BrainCircuit, Brain, Database, Globe, Mail, ClipboardList } from 'lucide-react';
-import { AgentPlan } from '@/app/types/clientTypes';
+import { AgentPlan } from '@/types/clientTypes';
 
 interface PlanCardProps {
   plan: AgentPlan;

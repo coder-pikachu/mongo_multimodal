@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Maximize2, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, ArrowLeft, Mic, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { SidePanel } from './SidePanel/SidePanel';
 import AgentView from './AgentView';
+import VoiceAgentView from './VoiceAgentView';
 import { ClientProject, ClientProjectData } from '@/types/clientTypes';
 import { SelectionProvider } from './SelectionContext';
 import ProjectHeader from './ProjectHeader';
@@ -19,6 +20,7 @@ export function AgentCentricLayout({ project, projectData, onDataUpdate }: Agent
   const router = useRouter();
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
+  const [mode, setMode] = useState<'text' | 'voice'>('text');
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -35,6 +37,16 @@ export function AgentCentricLayout({ project, projectData, onDataUpdate }: Agent
         setFocusMode((prev) => !prev);
         if (!focusMode) {
           setSidePanelOpen(false);
+        }
+      }
+
+      // V key: Toggle voice mode
+      if (e.key === 'v' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        // Only toggle if not typing in an input
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.isContentEditable) {
+          e.preventDefault();
+          setMode((prev) => (prev === 'text' ? 'voice' : 'text'));
         }
       }
 
@@ -55,12 +67,21 @@ export function AgentCentricLayout({ project, projectData, onDataUpdate }: Agent
     if (saved !== null) {
       setSidePanelOpen(JSON.parse(saved));
     }
+    const savedMode = localStorage.getItem('agentMode');
+    if (savedMode === 'voice' || savedMode === 'text') {
+      setMode(savedMode);
+    }
   }, []);
 
   // Save panel state to localStorage
   useEffect(() => {
     localStorage.setItem('sidePanelOpen', JSON.stringify(sidePanelOpen));
   }, [sidePanelOpen]);
+
+  // Save mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('agentMode', mode);
+  }, [mode]);
 
   return (
     <SelectionProvider>
@@ -95,6 +116,36 @@ export function AgentCentricLayout({ project, projectData, onDataUpdate }: Agent
               project={project}
               rightActions={
                 <div className="flex items-center gap-2">
+                  {/* Mode toggle */}
+                  <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
+                    <button
+                      onClick={() => setMode('text')}
+                      className={`
+                        px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5
+                        ${mode === 'text'
+                          ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                        }
+                      `}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Text
+                    </button>
+                    <button
+                      onClick={() => setMode('voice')}
+                      className={`
+                        px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5
+                        ${mode === 'voice'
+                          ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                        }
+                      `}
+                    >
+                      <Mic className="w-4 h-4" />
+                      Voice
+                    </button>
+                  </div>
+
                   {/* Focus mode toggle */}
                   <button
                     onClick={() => {
@@ -121,6 +172,11 @@ export function AgentCentricLayout({ project, projectData, onDataUpdate }: Agent
                     <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded">
                       B
                     </kbd>
+                    <span className="mx-1">·</span>
+                    <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded">
+                      V
+                    </kbd>
+                    <span className="text-xs">for voice</span>
                   </div>
                 </div>
               }
@@ -145,7 +201,11 @@ export function AgentCentricLayout({ project, projectData, onDataUpdate }: Agent
 
           {/* Agent interface */}
           <div className="flex-1 overflow-hidden">
-            <AgentView projectId={project._id} />
+            {mode === 'voice' ? (
+              <VoiceAgentView projectId={project._id} />
+            ) : (
+              <AgentView projectId={project._id} />
+            )}
           </div>
         </div>
 

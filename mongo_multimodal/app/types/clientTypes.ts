@@ -18,24 +18,37 @@ export interface ClientProject {
 export interface ClientProjectData {
   _id: string;
   projectId: string;
-  type: 'image' | 'document';
+  type: 'image' | 'document' | 'text_chunk' | 'web_chunk';
   content: {
     base64?: string; // for images
-    text?: string;   // for documents
+    text?: string;   // for documents and chunks
   };
   metadata: {
     filename: string;
     mimeType: string;
     size: number;
+    chunkInfo?: {
+      chunkIndex: number;
+      totalChunks: number;
+      parentId?: string;
+      sourceUrl?: string;
+      originalFilename?: string;
+      csvMetadata?: {
+        rowStart: number;
+        rowEnd: number;
+        columns: string[];
+      };
+    };
   };
-  analysis: {
+  analysis?: {
     description: string;
     tags: string[];
     insights: string[];
   };
-  embedding: number[]; // 1024-dimensional vector
-  createdAt: Date;
-  updatedAt: Date;
+  embedding?: number[]; // 1024-dimensional vector
+  score?: number; // Similarity score from vector search
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SearchResult extends Omit<ClientProjectData, 'embedding'> {

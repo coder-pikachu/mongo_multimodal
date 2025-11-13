@@ -6,7 +6,7 @@ import { SelectionTray } from './SelectionTray';
 import { SearchPanel } from './SearchPanel';
 import { BrowsePanel } from './BrowsePanel';
 import { UploadPanel } from './UploadPanel';
-import { ClientProjectData } from '@/app/types/clientTypes';
+import { ClientProjectData } from '@/types/clientTypes';
 
 interface SidePanelProps {
   projectId: string;

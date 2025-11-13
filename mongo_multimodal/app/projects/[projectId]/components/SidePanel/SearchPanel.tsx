@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Search, Target, Clock, Loader2, CheckSquare, Square, Eye } from 'lucide-react';
-import { SearchResult } from '@/app/types/clientTypes';
+import { SearchResult } from '@/types/clientTypes';
 import { useSelection } from '../SelectionContext';
 import { ImagePreviewModal } from '../ImagePreviewModal';
 

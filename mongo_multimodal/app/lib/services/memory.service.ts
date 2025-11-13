@@ -82,7 +82,7 @@ export async function storeMemory(
       );
 
       console.log('Memory enriched:', similarMemory._id);
-      return similarMemory._id;
+      return similarMemory._id || null;
     }
 
     // No similar memory found, create new one

@@ -17,6 +17,11 @@ export interface TextChunk {
     rowStart?: number; // for CSV
     rowEnd?: number; // for CSV
     columns?: string[]; // for CSV
+    csvMetadata?: {
+      rowStart: number;
+      rowEnd: number;
+      columns: string[];
+    };
   };
 }
 
@@ -60,7 +65,7 @@ export function chunkText(
     return [];
   }
 
-  const chunks: TextChunk[] = [];
+  const chunks: Omit<TextChunk, 'totalChunks'>[] = [];
   let currentChunk = '';
   let currentTokens = 0;
   let charStart = 0;
@@ -197,7 +202,7 @@ export function chunkCSV(
     actualRowsPerChunk = Math.max(10, Math.floor((2000 - headerTokens) / rowTokens));
   }
 
-  const chunks: TextChunk[] = [];
+  const chunks: Omit<TextChunk, 'totalChunks'>[] = [];
   let chunkIndex = 0;
   let charStart = 0;
 
@@ -209,7 +214,6 @@ export function chunkCSV(
     chunks.push({
       content: chunkContent,
       chunkIndex,
-      totalChunks: 0, // Will be updated below
       metadata: {
         charStart,
         charEnd: charStart + chunkContent.length,

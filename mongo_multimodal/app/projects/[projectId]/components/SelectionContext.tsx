@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { ClientProjectData, SearchResult } from '@/app/types/clientTypes';
+import { ClientProjectData, SearchResult } from '@/types/clientTypes';
 
 /**
  * SelectionContext - Multi-select state management for agent-centric UI

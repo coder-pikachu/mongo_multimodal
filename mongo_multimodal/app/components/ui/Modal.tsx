@@ -206,6 +206,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </Button>
         </>
       }
-    />
+    >
+      {/* Empty children - description is shown in modal header */}
+      <></>
+    </Modal>
   );
 };

@@ -4,7 +4,7 @@
  */
 
 import { Db, ObjectId } from 'mongodb';
-import { ConversationReference, Reference } from '@/app/types/models';
+import { ConversationReference, Reference } from '@/types/models';
 
 /**
  * Add reference to project data (track which conversations used it)
@@ -29,7 +29,7 @@ export async function addReferenceToProjectData(
     await db.collection('projectData').updateOne(
       { _id: new ObjectId(dataId) },
       {
-        $push: { referencedBy: reference },
+        $push: { referencedBy: reference } as any,
         $set: { updatedAt: new Date() },
       }
     );
@@ -72,7 +72,7 @@ export async function addBulkReferencesToProjectData(
     }));
 
     if (bulkOps.length > 0) {
-      await db.collection('projectData').bulkWrite(bulkOps);
+      await db.collection('projectData').bulkWrite(bulkOps as any);
     }
   } catch (error) {
     console.error('Error adding bulk references to project data:', error);
@@ -229,7 +229,7 @@ export function extractReferencesFromToolResults(
   // Deduplicate references by dataId/url
   const uniqueRefs = new Map<string, ConversationReference>();
   for (const ref of references) {
-    const key = ref.dataId || ref.url || ref.title;
+    const key = (ref.dataId?.toString() || ref.url || ref.title) as string;
     if (!uniqueRefs.has(key) || (ref.score && (!uniqueRefs.get(key)?.score || ref.score > uniqueRefs.get(key)!.score!))) {
       uniqueRefs.set(key, ref);
     }
@@ -261,7 +261,7 @@ export async function updateConversationWithReferences(
     await addBulkReferencesToProjectData(
       db,
       projectDataRefs.map((ref) => ({
-        dataId: ref.dataId!,
+        dataId: ref.dataId!.toString(),
         conversationId,
         sessionId,
         context: userQuery,

@@ -153,7 +153,7 @@ function convertMarkdownToHtml(markdown: string): string {
   // Convert bullet lists
   html = html.replace(/^\* (.+)$/gim, '<li style="margin: 8px 0;">$1</li>');
   html = html.replace(/^- (.+)$/gim, '<li style="margin: 8px 0;">$1</li>');
-  html = html.replace(/(<li[^>]*>.*<\/li>)/s, '<ul style="margin: 16px 0; padding-left: 24px;">$1</ul>');
+  html = html.replace(/(<li[^>]*>[\s\S]*?<\/li>)/g, '<ul style="margin: 16px 0; padding-left: 24px;">$1</ul>');
 
   // Convert numbered lists
   html = html.replace(/^\d+\. (.+)$/gim, '<li style="margin: 8px 0;">$1</li>');

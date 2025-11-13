@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, FileText, Image as ImageIcon, Globe, Mail } from 'lucide-react';
-import { ConversationReference } from '@/app/types/clientTypes';
+import { ConversationReference } from '@/types/clientTypes';
 
 interface ReferencesPanelProps {
   references: ConversationReference[];

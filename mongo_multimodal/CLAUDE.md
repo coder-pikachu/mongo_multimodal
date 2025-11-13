@@ -227,6 +227,59 @@ LANGCHAIN_API_KEY=...
 LANGCHAIN_PROJECT=...
 ```
 
+## Recent Features & UI Enhancements
+
+### Text File & Web Content Upload (Latest)
+**Added Support for:**
+- Text files (.txt, .csv, .json) with smart chunking
+- Web URL scraping with automatic content extraction
+- Semantic chunking (max 2000 tokens, 200 overlap)
+- CSV grouping (50-100 rows with headers preserved)
+- JSON flattening to readable text format
+- Automatic memory extraction from first 3 chunks
+
+**New Routes:**
+- `/api/projects/[projectId]/upload-text` - Text file chunking
+- `/api/projects/[projectId]/upload-web` - Web scraping
+- `/api/projects/[projectId]/data/process-chunks` - Batch embedding generation
+
+**New Types:** `text_chunk` and `web_chunk` with metadata (chunkInfo, parentId)
+
+### UI-Based Tool Toggles (Latest)
+**User Control Over Agent Tools:**
+- Real-time toggle switches above chat input (2x2 grid)
+- Users can enable/disable tools per session:
+  - 🧠 Memory (default: ON)
+  - 🌐 Web Search (default: OFF)
+  - 📧 Email (default: OFF)
+  - Deep Analysis (3 vs 5 steps)
+- Environment variables control availability, UI controls enablement
+- Dynamic tool registration based on user preferences
+
+### Clickable Source Citations (Latest)
+**Interactive References:**
+- All source citations `[Source: ...]`, `[Image: ...]`, `[Analysis: ...]` are clickable
+- One-click preview of referenced images/documents in modal
+- Smart file resolution using references and fallback search
+- Visual hover feedback with tooltips
+
+### Design System Overhaul (Latest)
+**Complete UI/UX Enhancement:**
+- MongoDB-themed semantic color palette (primary green: #00ED64)
+- 200+ design tokens in Tailwind config
+- 8-level elevation system with glow effects
+- 9 keyframe animations (fade-in, slide-in, scale-in, pulse-subtle)
+- Comprehensive component library:
+  - Button (6 variants × 5 sizes)
+  - Card (5 variants with composable sub-components)
+  - Input/Textarea (3 variants with error states)
+  - Modal (5 sizes with focus trap)
+  - Badge (9 colors × 4 sizes)
+- Scroll-based navigation blur (glassmorphism)
+- Unified neutral scale (zinc-based)
+- Custom scrollbar styling
+- Full ARIA accessibility
+
 ## Service Layer Details
 
 ### ProjectData Service (`lib/services/projectData.service.ts`)
@@ -669,6 +722,8 @@ AGENT_MEMORY_ENABLED=true  # Enable/disable memory system
 
 Advanced orchestration system with specialized agents working together.
 
+**Implementation Status:** Fully implemented but primarily used for complex multi-step queries. The main agent route (`/api/agent`) is the default interface with optional tool toggles.
+
 **Architecture:**
 
 ```
@@ -864,3 +919,74 @@ Stores persistent agent memories with vector embeddings for semantic search.
 
 ### agentConversations
 Records multi-agent collaboration sessions with full message history and results.
+
+---
+
+## Implementation Status & Corrections
+
+### What's Actually Implemented ✅
+
+**Core Features (100% Complete):**
+1. ✅ Gmail SMTP email service (replaced Resend completely)
+2. ✅ Agent memory system with embeddings and enrichment
+3. ✅ Multi-agent framework (coordinator + 5 specialists)
+4. ✅ Text file & web upload with chunking
+5. ✅ UI tool toggles for user control
+6. ✅ Clickable source citations
+7. ✅ Design system with MongoDB branding
+8. ✅ All 9 agent tools functional
+
+**Agent Tools (Main Route `/api/agent`):**
+- Base (always): planQuery, searchProjectData, searchSimilarItems, analyzeImage, projectDataAnalysis
+- Optional (UI toggles): rememberContext, recallMemory, searchWeb, sendEmail
+
+**Collections Created:**
+- ✅ `projects` - Project definitions
+- ✅ `projectData` - Data with embeddings (types: image, document, text_chunk, web_chunk)
+- ✅ `conversations` - Agent conversations with plan, toolExecutions, references
+- ✅ `agentMemories` - Persistent memories with embeddings
+- ✅ `agentConversations` - Multi-agent session records
+
+### Key Clarifications
+
+**Multi-Agent System:**
+- Coordinator agent creates plans using rule-based keyword matching (not LLM-based)
+- Tasks execute sequentially, not in parallel
+- Primarily used via `/api/multi-agent` route (less common than main agent route)
+- UI defaults to single-agent mode with tool toggles
+
+**Memory System:**
+- Fully functional with semantic search
+- Memory enrichment merges similar memories (score > 0.8)
+- Auto-extracts facts from conversation chunks
+- Accessible via `rememberContext` and `recallMemory` tools
+
+**Email Service:**
+- Uses Gmail SMTP via nodemailer (NOT Resend)
+- Requires `GMAIL_USER` and `GMAIL_APP_PASSWORD` environment variables
+- Beautiful HTML emails with MongoDB branding
+- Controlled by UI toggle (default: OFF)
+
+**Environment Configuration:**
+All optional features controlled by both environment variables (availability) AND UI toggles (enablement):
+- `AGENT_MEMORY_ENABLED=true` - Makes memory available
+- `MULTI_AGENT_ENABLED=true` - Enables multi-agent route
+- `PERPLEXITY_API_KEY` + `AGENT_WEB_SEARCH_ENABLED=true` - Enables web search
+- `GMAIL_USER` + `GMAIL_APP_PASSWORD` + `EMAIL_ENABLED=true` - Enables email
+
+**Planning Phase:**
+- Agent has `planQuery` tool but it's optional, not enforced
+- Users see plan card in UI when agent creates plan
+- Plan includes: steps, estimated tool calls, rationale, external data needs
+
+### Bug Fixes Applied
+
+**Memory System (CRITICAL):**
+- Fixed embedding generation: now passes `{ text: content }` object instead of string
+- Proper query type: uses `'document'` for storage, `'query'` for retrieval
+- UI icons added for all memory tools (Brain icon for rememberContext, Database for recallMemory)
+
+**Citations (UX):**
+- Made all source citations clickable with modal preview
+- Smart file resolution using references array first, then API fallback
+- Color-coded badges: blue (Source), green (Image), purple (Analysis)

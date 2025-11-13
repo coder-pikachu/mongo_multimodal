@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from '@clerk/nextjs';
 import { Navigation } from "./components/Navigation";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
@@ -15,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VectorSearch - Multimodal Knowledge Base",
-  description: "A multimedia knowledge base with vector search capabilities",
+  title: "AI Agent Space - Multimodal Knowledge Base",
+  description: "A multimedia knowledge base with AI agent capabilities",
 };
 
 export default function RootLayout({
@@ -25,22 +26,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased bg-zinc-50 dark:bg-zinc-900 min-h-screen text-zinc-900 dark:text-zinc-50`}
-        suppressHydrationWarning
-      >
-        <ThemeProvider 
-          attribute="class" 
-          defaultTheme="system" 
-          enableSystem 
-          disableTransitionOnChange
-          storageKey="theme"
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased bg-zinc-50 dark:bg-zinc-900 min-h-screen text-zinc-900 dark:text-zinc-50`}
+          suppressHydrationWarning
         >
-          <Navigation />
-          <main className="pt-16">{children}</main>
-        </ThemeProvider>
-      </body>
-    </html>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            storageKey="theme"
+          >
+            <Navigation />
+            <main className="pt-16">{children}</main>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

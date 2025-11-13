@@ -18,7 +18,7 @@ export async function POST(
   {
     const paramsFound = await params;
     const db = await getDb();
-    const { query, type = 'text', mode = 'agent', page = 1, limit = 12 } = await request.json();
+    const { query, type = 'text', mode = 'agent', page = 1, limit = 12, includeBase64 = false } = await request.json();
 
     if ( !query )
     {
@@ -28,6 +28,15 @@ export async function POST(
     // "Search" mode for direct, paginated results
     if (mode === 'search') {
       const searchResults = await doPaginatedVectorSearch(db, paramsFound.projectId, query, type, page, limit);
+
+      // Strip base64 from results if not requested (default behavior)
+      if (!includeBase64 && searchResults.results) {
+        searchResults.results = searchResults.results.map(result => ({
+          ...result,
+          content: result.content?.base64 ? { ...result.content, base64: undefined } : result.content
+        }));
+      }
+
       return NextResponse.json(searchResults);
     }
 

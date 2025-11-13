@@ -1,28 +1,21 @@
 import Link from 'next/link';
 import { Project } from '@/types/models';
+import { getDb } from '@/lib/mongodb';
 
 async function getProjects(): Promise<Project[]> {
-  // Use absolute URL for server components
-  const baseUrl = process.env.VERCEL_URL
-    ? `${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
-
   try {
-    console.log('Fetching projects...' + baseUrl);
-    const response = await fetch(`${baseUrl}/api/projects`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Required for server components to make renpquests
-      cache: 'no-store'
-    });
+    const db = await getDb();
+    const projects = await db.collection('projects')
+      .find()
+      .sort({ createdAt: -1 })
+      .toArray();
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
+    return projects.map(p => ({
+      ...p,
+      _id: p._id,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt
+    })) as Project[];
   } catch (error) {
     console.error('Failed to fetch projects:', error);
     return [];

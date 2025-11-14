@@ -64,8 +64,11 @@ export default function VoiceAgentView({ projectId }: Props) {
   const [displayedImages, setDisplayedImages] = useState<ProjectData[]>([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [previewImage, setPreviewImage] = useState<ProjectData | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [isSilent, setIsSilent] = useState(false);
 
   // Refs
+  const transcriptRef = useRef<HTMLDivElement>(null);
   const inputContextRef = useRef<AudioContext | null>(null);
   const outputContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef(0);
@@ -75,6 +78,7 @@ export default function VoiceAgentView({ projectId }: Props) {
   const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const isRecordingRef = useRef(false); // Use ref for audio processing callback
   const isMutedRef = useRef(false); // Use ref for audio processing callback
+  const silenceStartRef = useRef<number | null>(null);
 
   // Refs for secure session
   const sessionTokenRef = useRef<string | null>(null);
@@ -254,6 +258,39 @@ export default function VoiceAgentView({ projectId }: Props) {
     }
   }, [projectId, sessionIdRef, sessionTokenRef]);
 
+  // Play subtle processing sound when agent is working
+  const playProcessingSound = useCallback(() => {
+    if (!outputContextRef.current) return;
+
+    try {
+      const ctx = outputContextRef.current;
+      const now = ctx.currentTime;
+
+      // Create oscillator for a pleasant "ding" sound
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      // Connect nodes
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      // Gentle ascending tones (C5 → E5)
+      oscillator.frequency.setValueAtTime(523.25, now); // C5
+      oscillator.frequency.linearRampToValueAtTime(659.25, now + 0.1); // E5
+
+      // Smooth envelope: fade in and fade out
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.08, now + 0.05); // Quiet volume
+      gainNode.gain.linearRampToValueAtTime(0, now + 0.2);
+
+      // Play for 200ms
+      oscillator.start(now);
+      oscillator.stop(now + 0.2);
+    } catch (err) {
+      console.error('Processing sound error:', err);
+    }
+  }, []);
+
   // Execute image analysis tool (server-side analysis)
   const handleAnalyzeImage = useCallback(async (
     args: { dataId: string },
@@ -348,7 +385,7 @@ export default function VoiceAgentView({ projectId }: Props) {
         });
       }
     }
-  }, [sessionIdRef, sessionTokenRef]);
+  }, [sessionIdRef, sessionTokenRef, playProcessingSound]);
 
   // Handle messages from Gemini
   const handleMessage = useCallback(
@@ -463,6 +500,10 @@ export default function VoiceAgentView({ projectId }: Props) {
       // Handle tool calls
       if (message.toolCall?.functionCalls) {
         console.log('🔧 Tool calls detected:', message.toolCall.functionCalls.length);
+
+        // Play subtle audio feedback when agent starts processing
+        playProcessingSound();
+
         for (const funcCall of message.toolCall.functionCalls) {
           console.log('🔧 Executing tool:', funcCall.name, 'with args:', funcCall.args);
           setStatus(`Executing ${funcCall.name}...`);
@@ -475,7 +516,7 @@ export default function VoiceAgentView({ projectId }: Props) {
         }
       }
     },
-    [handleSearchTool, handleAnalyzeImage]
+    [handleSearchTool, handleAnalyzeImage, playProcessingSound]
   );
 
   // Parse text for image references to highlight correct image
@@ -580,12 +621,37 @@ export default function VoiceAgentView({ projectId }: Props) {
           return;
         }
 
+        const pcmData = e.inputBuffer.getChannelData(0);
+
+        // Calculate audio level (RMS - root mean square)
+        let sum = 0;
+        for (let i = 0; i < pcmData.length; i++) {
+          sum += pcmData[i] * pcmData[i];
+        }
+        const rms = Math.sqrt(sum / pcmData.length);
+        const normalizedLevel = Math.min(rms * 10, 1); // Normalize to 0-1 range
+        setAudioLevel(normalizedLevel);
+
+        // Detect prolonged silence (5 seconds threshold)
+        const SILENCE_THRESHOLD = 0.01; // Very low volume
+        const SILENCE_DURATION_MS = 5000; // 5 seconds
+
+        if (normalizedLevel < SILENCE_THRESHOLD) {
+          if (!silenceStartRef.current) {
+            silenceStartRef.current = Date.now();
+          } else if (Date.now() - silenceStartRef.current > SILENCE_DURATION_MS) {
+            setIsSilent(true);
+          }
+        } else {
+          silenceStartRef.current = null;
+          setIsSilent(false);
+        }
+
         // Skip sending audio when muted (simulates silence for Gemini VAD)
         if (isMutedRef.current) {
           return;
         }
 
-        const pcmData = e.inputBuffer.getChannelData(0);
         const audioBlob = createBlob(pcmData);
 
         chunkCount++;
@@ -863,13 +929,17 @@ export default function VoiceAgentView({ projectId }: Props) {
     window.location.reload(); // Simple approach for full reset
   };
 
-  return (
-    <div className="relative h-full w-full bg-white dark:bg-neutral-950 overflow-hidden">
-      {/* 3D Audio Orb Background */}
-      <AnimatedOrb isActive={isRecording || isSpeaking} isSpeaking={isSpeaking} />
+  // Auto-scroll transcript to bottom when new messages arrive
+  useEffect(() => {
+    if (transcriptRef.current && transcript.length > 0) {
+      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    }
+  }, [transcript]);
 
-      {/* Generative UI: Image Gallery */}
-      <div className="absolute inset-x-0 top-0 h-2/3 z-10">
+  return (
+    <div className="relative h-full w-full bg-gradient-to-br from-neutral-50 via-white to-neutral-100 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden">
+      {/* Generative UI: Image Gallery - Very compact */}
+      <div className="absolute inset-x-0 top-0 h-[25%] z-10">
         <GenerativeImageGallery
           images={displayedImages}
           activeIndex={activeImageIndex}
@@ -877,30 +947,54 @@ export default function VoiceAgentView({ projectId }: Props) {
         />
       </div>
 
-      {/* Transcript */}
-      <div className="absolute bottom-32 left-0 right-0 h-48 z-20 bg-neutral-100/80 dark:bg-neutral-900/80 backdrop-blur-lg border-t border-neutral-200 dark:border-neutral-800 p-4 overflow-y-auto">
-        {transcript.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-neutral-500 dark:text-neutral-500 text-sm">
-              Voice transcript will appear here...
-            </p>
+      {/* Transcript with Orb - Much larger area */}
+      <div className="absolute bottom-32 left-0 right-0 top-[25%] z-20">
+        <div className="relative h-full w-full flex items-start gap-4 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-xl border-t border-neutral-200/50 dark:border-neutral-800/50 shadow-2xl p-4">
+          {/* Modern Audio Orb - Left side */}
+          <div className="flex-shrink-0 pt-2">
+            <AnimatedOrb
+              isActive={isRecording || isSpeaking}
+              isSpeaking={isSpeaking}
+              isMuted={isMuted}
+              audioLevel={audioLevel}
+            />
           </div>
-        ) : (
-          <div className="space-y-2">
-            {transcript.map((msg, i) => (
-              <div key={i} className="mb-2">
-                <span
-                  className={`font-semibold ${
-                    msg.role === 'user' ? 'text-blue-500 dark:text-blue-400' : 'text-primary-600 dark:text-primary-400'
-                  }`}
-                >
-                  {msg.role === 'user' ? 'You' : 'Agent'}:
-                </span>
-                <span className="text-neutral-900 dark:text-neutral-100 ml-2">{msg.content}</span>
+
+          {/* Transcript content - Right side */}
+          <div ref={transcriptRef} className="flex-1 h-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-neutral-400 dark:scrollbar-thumb-neutral-600 scrollbar-track-transparent">
+            {/* Silence warning */}
+            {isSilent && isRecording && !isMuted && (
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg">
+                <p className="text-amber-800 dark:text-amber-300 text-sm font-medium flex items-center gap-2">
+                  <span className="text-xl">🔇</span>
+                  We can't hear you! Please check your microphone.
+                </p>
               </div>
-            ))}
+            )}
+            {transcript.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-neutral-500 dark:text-neutral-500 text-sm">
+                  Voice transcript will appear here...
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 pb-2">
+                {transcript.map((msg, i) => (
+                  <div key={i} className="mb-2 break-words">
+                    <span
+                      className={`font-semibold ${
+                        msg.role === 'user' ? 'text-blue-500 dark:text-blue-400' : 'text-primary-600 dark:text-primary-400'
+                      }`}
+                    >
+                      {msg.role === 'user' ? 'You' : 'Agent'}:
+                    </span>
+                    <span className="text-neutral-900 dark:text-neutral-100 ml-2">{msg.content}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Voice Controls */}

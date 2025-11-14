@@ -5,81 +5,112 @@ import { motion } from 'framer-motion';
 interface Props {
   isActive: boolean;
   isSpeaking?: boolean;
+  isMuted?: boolean;
+  audioLevel?: number;
 }
 
-export function AnimatedOrb({ isActive, isSpeaking = false }: Props) {
+export function AnimatedOrb({ isActive, isSpeaking = false, isMuted = false, audioLevel = 0 }: Props) {
+  // Only animate when actually listening (not muted)
+  const shouldAnimate = isActive && !isMuted;
+  const volumeScale = shouldAnimate ? 1 + (audioLevel * 0.12) : 1;
   return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-      {/* Main orb */}
-      <motion.div
-        animate={{
-          scale: isActive ? [1, 1.1, 1] : 1,
-          opacity: isActive ? 0.4 : 0.2,
-        }}
-        transition={{
-          scale: {
-            duration: isSpeaking ? 1 : 2,
-            repeat: isActive ? Infinity : 0,
-            ease: 'easeInOut',
-          },
-          opacity: {
-            duration: 0.5,
-          },
-        }}
-        className={`w-64 h-64 md:w-96 md:h-96 rounded-full blur-3xl ${
-          isActive
-            ? 'bg-gradient-to-r from-primary-500 via-blue-500 to-purple-500'
-            : 'bg-gradient-to-r from-neutral-300 to-neutral-400 dark:from-neutral-700 dark:to-neutral-800'
-        }`}
-      />
-
-      {/* Secondary ring for speaking state */}
-      {isSpeaking && (
+    <div className="relative flex items-center justify-center pointer-events-none w-32 h-32">
+      {/* Single elegant pulse ring - only when actively listening */}
+      {shouldAnimate && (
         <motion.div
           animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.3, 0, 0.3],
+            scale: [1, 1.4],
+            opacity: [0.2, 0],
           }}
           transition={{
-            duration: 1.5,
+            duration: 2.5,
             repeat: Infinity,
             ease: 'easeOut',
           }}
-          className="absolute w-80 h-80 md:w-[30rem] md:h-[30rem] rounded-full blur-2xl bg-gradient-to-r from-primary-400 to-blue-400"
+          className="absolute inset-0 rounded-full bg-gradient-to-r from-slate-400/30 to-slate-500/30 dark:from-slate-500/20 dark:to-slate-600/20"
         />
       )}
 
-      {/* Outer glow */}
-      {isActive && (
+      {/* Main orb - minimal glassmorphism */}
+      <motion.div
+        animate={{
+          scale: shouldAnimate ? volumeScale : (isMuted ? 0.92 : 0.95),
+        }}
+        transition={{
+          scale: { duration: 0.4, ease: 'easeOut' },
+        }}
+        className={`relative flex items-center justify-center w-24 h-24 rounded-full backdrop-blur-xl transition-all duration-700 ${
+          shouldAnimate
+            ? 'bg-white/40 dark:bg-slate-800/50 border-2 border-slate-300/60 dark:border-slate-600/60 shadow-xl'
+            : isMuted
+            ? 'bg-white/20 dark:bg-slate-900/30 border-2 border-orange-400/50 dark:border-orange-500/40 shadow-lg'
+            : 'bg-white/20 dark:bg-slate-900/30 border-2 border-slate-300/40 dark:border-slate-700/40 shadow-md'
+        }`}
+      >
+        {/* Inner subtle glow */}
         <motion.div
           animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.2, 0.1, 0.2],
+            opacity: shouldAnimate ? [0.3, 0.5, 0.3] : 0.2,
           }}
           transition={{
             duration: 3,
-            repeat: Infinity,
+            repeat: shouldAnimate ? Infinity : 0,
             ease: 'easeInOut',
           }}
-          className="absolute w-96 h-96 md:w-[40rem] md:h-[40rem] rounded-full blur-3xl bg-gradient-to-r from-primary-600/30 to-blue-600/30"
+          className={`absolute inset-3 rounded-full ${
+            shouldAnimate
+              ? 'bg-gradient-to-br from-slate-200/40 to-slate-300/30 dark:from-slate-700/30 dark:to-slate-600/20'
+              : 'bg-slate-200/15 dark:bg-slate-800/15'
+          }`}
         />
-      )}
 
-      {/* Center dot indicator */}
-      {isActive && (
+        {/* Clean centered icon */}
         <motion.div
           animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.6, 1, 0.6],
+            scale: shouldAnimate && audioLevel > 0.1 ? [1, 1.08, 1] : 1,
           }}
           transition={{
-            duration: isSpeaking ? 0.5 : 1.5,
-            repeat: Infinity,
+            duration: 1.2,
+            repeat: shouldAnimate && audioLevel > 0.1 ? Infinity : 0,
             ease: 'easeInOut',
           }}
-          className="absolute w-4 h-4 rounded-full bg-primary-400 shadow-lg shadow-primary-500/50"
-        />
-      )}
+          className="relative z-10 text-4xl leading-none"
+          style={{
+            filter: shouldAnimate ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' : 'none',
+          }}
+        >
+          {isMuted ? (
+            <span className="text-orange-500 dark:text-orange-400">🔇</span>
+          ) : isSpeaking ? (
+            <span className="text-slate-700 dark:text-slate-300">💬</span>
+          ) : shouldAnimate ? (
+            <span className="text-slate-700 dark:text-slate-300">👂</span>
+          ) : (
+            <span className="text-slate-400 dark:text-slate-600 opacity-60">⏸️</span>
+          )}
+        </motion.div>
+
+        {/* Minimal audio wave indicator - only when actively listening */}
+        {shouldAnimate && !isSpeaking && audioLevel > 0.05 && (
+          <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-25">
+            {[0, 0.12, 0.24].map((delay, i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  scaleY: [0.3 + audioLevel * 0.2, 0.7 + audioLevel * 0.4, 0.3 + audioLevel * 0.2],
+                }}
+                transition={{
+                  duration: 1.2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay,
+                }}
+                className="w-0.5 h-6 bg-slate-500 dark:bg-slate-400 rounded-full"
+              />
+            ))}
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 }

@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Fetch project context
     let projectContext = '';
+    let projectName = '';
     if (projectId) {
       try {
         const db = await getDb();
@@ -58,6 +59,7 @@ export async function GET(request: NextRequest) {
           { projection: { name: 1, description: 1 } }
         );
         if (project) {
+          projectName = project.name;
           projectContext = `\n\nPROJECT CONTEXT:\n- Project Name: ${project.name}\n- Project Description: ${project.description || 'No description provided'}\n\nWhen formulating search queries, consider this project context to find the most relevant information in the multimodal embedding space. Craft your queries to align with the project domain and content type.`;
           console.log('[Voice Stream GET] Project context loaded:', project.name);
         }
@@ -90,9 +92,25 @@ export async function GET(request: NextRequest) {
             console.log(`[Voice Stream] Gemini connection opened: ${sessionId}`);
           },
           onmessage: (message: any) => {
-            console.log('[Voice Stream] Gemini message received!');
-            console.log('[Voice Stream] Message type:', Object.keys(message).join(', '));
-            console.log('[Voice Stream] Full message:', JSON.stringify(message, null, 2).substring(0, 500));
+            console.log('[Voice Stream] ✅ Gemini message received!');
+            console.log('[Voice Stream] Message keys:', Object.keys(message).join(', '));
+
+            // Log more details about the message
+            if (message.serverContent) {
+              console.log('[Voice Stream] serverContent keys:', Object.keys(message.serverContent).join(', '));
+              if (message.serverContent.modelTurn) {
+                console.log('[Voice Stream] 🎤 Model is responding (modelTurn detected)');
+              }
+              if (message.serverContent.interrupted) {
+                console.log('[Voice Stream] ⚠️ Interrupted:', message.serverContent.interrupted);
+              }
+              if (message.serverContent.turnComplete) {
+                console.log('[Voice Stream] ✓ Turn complete:', message.serverContent.turnComplete);
+              }
+            }
+            if (message.toolCall) {
+              console.log('[Voice Stream] 🔧 Tool call detected:', JSON.stringify(message.toolCall, null, 2).substring(0, 300));
+            }
 
             // Send message to SSE controller if connected
             const controller = sseControllers.get(sessionId);
@@ -106,16 +124,17 @@ export async function GET(request: NextRequest) {
               }
             } else {
               // Queue message if no active SSE stream
+              console.log('[Voice Stream] ⚠️ No SSE controller, queueing message');
               const queue = messageQueues.get(sessionId) || [];
               queue.push(message);
               messageQueues.set(sessionId, queue);
             }
           },
           onerror: (error: any) => {
-            console.error(`[Voice Stream] Gemini error: ${sessionId}`, error);
+            console.error(`[Voice Stream] ❌ Gemini error: ${sessionId}`, error);
           },
           onclose: (event: any) => {
-            console.log(`[Voice Stream] Gemini connection closed: ${sessionId}`, event);
+            console.log(`[Voice Stream] 🔌 Gemini connection closed: ${sessionId}`, event);
           },
         },
         config: {
@@ -130,48 +149,75 @@ export async function GET(request: NextRequest) {
           realtimeInputConfig: {
             automaticActivityDetection: {
               disabled: false,  // Enable automatic VAD
-              startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_LOW,
-              endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
-              silenceDurationMs: 1500,  // 1.5 seconds of silence to detect turn end
+              startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_MEDIUM,  // More sensitive
+              endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_MEDIUM,  // More sensitive
+              silenceDurationMs: 800,  // Reduced from 1500ms for faster response
               prefixPaddingMs: 300,     // Include 300ms before speech starts
             }
           },
 
           systemInstruction: {
             parts: [{
-              text: `You are a helpful AI assistant with access to a user's multimodal knowledge base.${projectContext}
+              text: `You are a friendly AI voice assistant with access to ${projectName || 'this project'}.${projectContext}
 
-MANDATORY WORKFLOW - NEVER SKIP:
-1. ALWAYS use searchProjectData FIRST for ANY question about the user's data/project
-2. If images are found, ALWAYS use analyzeImage to actually see the content
-3. ONLY then respond based on what you found
+**CRITICAL: MANDATORY TOOL USAGE**
 
-CRITICAL RULES:
-- NEVER answer without searching first (you have no knowledge about this user's data)
-- searchProjectData only returns metadata (filenames, tags) - NOT the actual content
-- To actually SEE images, you MUST call analyzeImage with the dataId
-- Without searching and analyzing, you're guessing - this is FORBIDDEN
+For ANY question about images, documents, locations, or content in the project:
 
-TOOLS:
-- searchProjectData(query, maxResults): Find items by semantic search
-- analyzeImage(dataId): Get visual analysis of a specific image
+1. **YOU MUST CALL searchProjectData IMMEDIATELY** - This is NON-NEGOTIABLE
+   - Never answer without searching first
+   - The query should match the user's question
+   - Request 3-5 results for sufficient context
 
-CORRECT WORKFLOW EXAMPLES:
-User: "What do you see?"
-✅ [searchProjectData("images") → Get ID "abc"] → [analyzeImage("abc")] → "I see a detailed engine diagram..."
+2. **ONLY USE INFORMATION FROM TOOL RESULTS** - This is MANDATORY
+   - ❌ NEVER use general knowledge or make assumptions
+   - ❌ NEVER guess based on typical scenarios ("spare tires are usually in the trunk")
+   - ✅ ONLY speak about what searchProjectData actually returns
+   - ✅ IF tools return nothing, say "I don't have that information in this project"
 
+3. **If user asks to see/analyze a specific image by ID**
+   - Call analyzeImage with the dataId
+   - Describe what you actually see in the returned analysis
+
+**AFTER receiving tool results, speak naturally:**
+- Acknowledge briefly: "Let me check..." or "Looking at that now..."
+- Synthesize the results conversationally
+- Don't mention "tools", "searching", "database", or "function calls"
+- Speak as if you're reviewing the information yourself
+- Reference page numbers and specific details from the results
+
+**WORKFLOW EXAMPLES:**
+
+❌ **WRONG (answering without tools):**
 User: "Where is the spare tire?"
-✅ [searchProjectData("spare tire location") → Get ID "xyz"] → [analyzeImage("xyz")] → "The spare tire is located in the trunk compartment..."
+Agent: "Let me check... Spare tires are typically in the trunk."
+**Problem:** Agent guessed without calling searchProjectData!
 
-User: "Tell me about this manual"
-✅ [searchProjectData("manual overview") → Results] → "Based on your manual, I found..."
+✅ **CORRECT (mandatory tool execution):**
+User: "Where is the spare tire?"
+→ [Agent MUST call searchProjectData("spare tire location")]
+→ [Tool returns: Vehicle_Manual_page_110.jpg - "Spare tire storage under cargo floor"]
+→ Agent speaks: "Let me check that... I can see on page 110 that the spare tire is located under the cargo floor in the trunk."
 
-WRONG EXAMPLES:
-❌ User: "What images do you have?" → Answering without searchProjectData
-❌ [searchProjectData("images")] → Responding without analyzeImage for images
-❌ Answering from general knowledge instead of searching
+❌ **WRONG (vague without searching):**
+User: "What's in the manual?"
+Agent: "You have maintenance information and diagrams."
+**Problem:** Too vague, didn't search first!
 
-Keep responses conversational and natural for voice interaction, don't talk about the source, just mention the page number this information is found, but ALWAYS search first.`
+✅ **CORRECT (search then be specific):**
+User: "What's in the manual?"
+→ [Agent calls searchProjectData("manual content", maxResults: 5)]
+→ [Tool returns: 5 specific images with descriptions]
+→ Agent speaks: "Let me check... Your manual has sections on spare tire storage on page 110, engine oil specifications on page 23, and tire pressure diagrams on page 45."
+
+**REMEMBER:**
+- 🔴 NEVER answer content questions without calling searchProjectData first
+- 🔴 NEVER use general knowledge - ONLY use actual tool results
+- 🟢 ALWAYS call tools BEFORE responding
+- 🟢 ALWAYS examine what the tool actually returned
+- 🟢 Be specific with page numbers and details from the search results
+
+Be warm, helpful, and conversational - but ALWAYS ground your responses in actual tool data!`
             }]
           },
           speechConfig: {
@@ -442,9 +488,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'Tool response sent' });
     }
 
-    // 7b. Handle image analysis (server-side)
+    // 7b. Handle image analysis (server-side) - VOICE OPTIMIZED for speed
     if (action === 'analyzeImage' && body.dataId) {
-      console.log('[Voice Stream POST] Analyzing image server-side:', body.dataId);
+      console.log('[Voice Stream POST] Analyzing image server-side (VOICE MODE):', body.dataId);
 
       try {
         const db = await getDb();
@@ -461,31 +507,48 @@ export async function POST(request: NextRequest) {
 
         console.log('[Voice Stream POST] Image found:', projectData.metadata?.filename);
 
-        // Compress the image
+        // AGGRESSIVE compression for voice mode (smaller = faster responses)
         const compressed = await compressImage(
           projectData.content.base64,
-          projectData.metadata?.mimeType || 'image/jpeg'
+          projectData.metadata?.mimeType || 'image/jpeg',
+          768,  // Smaller max width (vs 1568 standard)
+          70    // Lower quality (vs 85 standard)
         );
 
-        console.log('[Voice Stream POST] Image compressed:', {
+        console.log('[Voice Stream POST] Image compressed for voice:', {
           originalKB: compressed.originalSizeKB,
           compressedKB: compressed.sizeKB,
+          compressionRatio: `${Math.round((1 - compressed.sizeKB / compressed.originalSizeKB) * 100)}%`
         });
 
-        // Use Claude/OpenAI for vision analysis (same as regular agent)
+        // Get user query context from request if available
+        const userQuery = body.userQuery || body.query || '';
+
+        // Use fastest available model with STRUCTURED OUTPUT
         const selectedProvider = (process.env.LLM_FOR_ANALYSIS as 'claude' | 'openai') || 'claude';
+
+        // Minimal prompt for speed with structured JSON response
+        const prompt = `Analyze "${projectData.metadata?.filename || 'this image'}"${userQuery ? ` focusing on: ${userQuery}` : ''}.
+
+Return ONLY valid JSON (no markdown, no extra text):
+{
+  "summary": "1-2 sentence overview of what you see",
+  "keyPoints": ["specific detail 1", "specific detail 2", "specific detail 3"],
+  "textContent": "any visible text/numbers/labels in the image",
+  "pageNumber": "page number if visible, or null"
+}`;
 
         const result = await generateText({
           model: selectedProvider === 'claude'
             ? anthropic('claude-haiku-4-5-20251001')
-            : openai('gpt-5-nano-2025-08-07'),
+            : openai('gpt-4o-mini'),  // Use mini for speed
           messages: [
             {
               role: 'user',
               content: [
                 {
                   type: 'text',
-                  text: 'Analyze this image in detail. Describe what you see, including any text, objects, locations, technical details, or important information visible in the image. Be specific and thorough.',
+                  text: prompt,
                 },
                 {
                   type: 'image',
@@ -494,15 +557,53 @@ export async function POST(request: NextRequest) {
               ],
             },
           ],
+          maxOutputTokens: 500,  // Limit output for speed
         });
 
-        const analysis = result.text;
-        console.log('[Voice Stream POST] Analysis complete, length:', analysis.length);
+        const rawText = result.text.trim();
+        console.log('[Voice Stream POST] Analysis complete, length:', rawText.length);
+
+        // Parse structured JSON response
+        let structured;
+        try {
+          // Remove markdown code blocks if present
+          const jsonText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          structured = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.warn('[Voice Stream POST] Failed to parse JSON, using fallback:', parseError);
+          structured = {
+            summary: rawText.substring(0, 200),
+            keyPoints: [],
+            textContent: '',
+            pageNumber: null
+          };
+        }
+
+        // Build conversational response for voice
+        let voiceResponse = structured.summary || 'I analyzed the image.';
+
+        if (structured.keyPoints && structured.keyPoints.length > 0) {
+          voiceResponse += ' ' + structured.keyPoints.slice(0, 3).join('. ');
+        }
+
+        if (structured.textContent) {
+          voiceResponse += ` The image contains: ${structured.textContent}.`;
+        }
+
+        if (structured.pageNumber) {
+          voiceResponse += ` This is from page ${structured.pageNumber}.`;
+        }
 
         return NextResponse.json({
           success: true,
           filename: projectData.metadata?.filename,
-          analysis,
+          analysis: voiceResponse,  // Conversational for Gemini to speak
+          structured,  // Structured data for client
+          compressionStats: {
+            originalKB: compressed.originalSizeKB,
+            compressedKB: compressed.sizeKB,
+            savedKB: compressed.originalSizeKB - compressed.sizeKB
+          }
         });
       } catch (error) {
         console.error('[Voice Stream POST] Failed to analyze image:', error);

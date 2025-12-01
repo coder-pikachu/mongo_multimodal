@@ -939,7 +939,7 @@ export default function VoiceAgentView({ projectId }: Props) {
   return (
     <div className="relative h-full w-full bg-gradient-to-br from-neutral-50 via-white to-neutral-100 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950 overflow-hidden">
       {/* Generative UI: Image Gallery - Very compact */}
-      <div className="absolute inset-x-0 top-0 h-[25%] z-10">
+      <div className="absolute inset-x-0 top-0 h-[30%] z-10">
         <GenerativeImageGallery
           images={displayedImages}
           activeIndex={activeImageIndex}
@@ -948,7 +948,7 @@ export default function VoiceAgentView({ projectId }: Props) {
       </div>
 
       {/* Transcript with Orb - Much larger area */}
-      <div className="absolute bottom-32 left-0 right-0 top-[25%] z-20">
+      <div className="absolute bottom-32 left-0 right-0 top-[30%] z-20">
         <div className="relative h-full w-full flex items-start gap-4 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-xl border-t border-neutral-200/50 dark:border-neutral-800/50 shadow-2xl p-4">
           {/* Modern Audio Orb - Left side */}
           <div className="flex-shrink-0 pt-2">

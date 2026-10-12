@@ -536,7 +536,7 @@ LLM_FOR_ANALYSIS=openai
 ```
 
 Models used:
-- Claude: `claude-haiku-4-5-20251001`
+- Claude: `claude-haiku-4-5`
 - OpenAI: `gpt-5-nano-2025-08-07`
 
 ### Vector Search Strategies

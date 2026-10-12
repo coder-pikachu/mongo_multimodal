@@ -3,10 +3,10 @@
  * Specialized agent for deep content analysis and data extraction
  */
 
+import { anthropic } from '../groveAnthropic';
 import { Agent } from './base.agent';
 import { AgentInput, AgentOutput } from '@/types/agent.types';
 import { compressImage, estimateImageTokens } from '@/lib/image-utils';
-import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 import { ObjectId } from 'mongodb';
@@ -110,7 +110,7 @@ export class AnalysisAgent extends Agent {
       // Analyze with LLM
       const analysisResult = await streamText({
         model: selectedProvider === 'claude'
-          ? anthropic('claude-haiku-4-5-20251001')
+          ? anthropic('claude-haiku-4-5')
           : openai('gpt-5-nano-2025-08-07'),
         maxOutputTokens: 4096,
         messages: [

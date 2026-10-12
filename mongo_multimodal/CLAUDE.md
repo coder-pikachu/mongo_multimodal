@@ -56,7 +56,7 @@ The application provides three distinct ways to interact with data, each using d
 2. **Chat Mode** (`/api/chat/route.ts`)
    - Conversational Q&A using Vercel AI SDK
    - RAG-enhanced: Performs vector search, then streams response with context
-   - Uses `claude-haiku-4-5-20251001` model via `@ai-sdk/anthropic`
+   - Uses `claude-haiku-4-5` model via `@ai-sdk/anthropic`
 
 3. **Agent Mode** (`/api/agent/route.ts`)
    - LangGraph-inspired agentic workflow with advanced planning and multi-tool support
@@ -301,7 +301,7 @@ Provides centralized functions for all projectData operations:
 
 **Model Selection:**
 All analysis functions automatically use the provider specified in `LLM_FOR_ANALYSIS` environment variable:
-- `claude` → `claude-haiku-4-5-20251001`
+- `claude` → `claude-haiku-4-5`
 - `openai` → `gpt-5-nano-2025-08-07`
 
 ### Vector Search Service (`lib/services/vectorSearch.service.ts`)
@@ -430,7 +430,7 @@ PDFs are converted to images page-by-page:
 ### Provider Selection
 
 Both Claude and OpenAI are supported. Selection is controlled by `LLM_FOR_ANALYSIS` environment variable:
-- **Chat Mode**: Always uses Claude Haiku 4.5 (`claude-haiku-4-5-20251001`)
+- **Chat Mode**: Always uses Claude Haiku 4.5 (`claude-haiku-4-5`)
 - **Agent Mode**: Respects `LLM_FOR_ANALYSIS` for tool execution
 - **Analysis**: Respects `LLM_FOR_ANALYSIS` for visual content analysis
 - OpenAI uses `gpt-5-nano-2025-08-07` when selected

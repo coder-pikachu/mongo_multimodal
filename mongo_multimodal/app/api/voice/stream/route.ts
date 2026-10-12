@@ -4,9 +4,9 @@
  * Uses Server-Sent Events (SSE) for real-time communication
  */
 
+import { anthropic } from '../../../lib/groveAnthropic';
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Modality, StartSensitivity, EndSensitivity } from '@google/genai';
-import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { verifyVoiceSessionToken, extractTokenFromHeader } from '@/lib/jwt';
@@ -540,7 +540,7 @@ Return ONLY valid JSON (no markdown, no extra text):
 
         const result = await generateText({
           model: selectedProvider === 'claude'
-            ? anthropic('claude-haiku-4-5-20251001')
+            ? anthropic('claude-haiku-4-5')
             : openai('gpt-4o-mini'),  // Use mini for speed
           messages: [
             {

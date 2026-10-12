@@ -3,11 +3,11 @@
  * Handles text file chunking, web scraping, and memory extraction
  */
 
+import { anthropic } from '../groveAnthropic';
 import { Db, ObjectId } from 'mongodb';
 import { chunkFileContent, TextChunk } from '../text-chunker';
 import { scrapeWebsite, validateURL, normalizeURL } from '../web-scraper';
 import { storeMemory } from './memory.service';
-import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 
@@ -31,7 +31,7 @@ function getSelectedProvider(): 'claude' | 'openai' {
  */
 function getModel(provider: 'claude' | 'openai') {
   if (provider === 'claude') {
-    return anthropic('claude-haiku-4-5-20251001');
+    return anthropic('claude-haiku-4-5');
   }
   return openai('gpt-5-nano-2025-08-07');
 }

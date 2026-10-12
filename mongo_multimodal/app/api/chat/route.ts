@@ -1,4 +1,4 @@
-import { anthropic } from '@ai-sdk/anthropic';
+import { anthropic } from '../../lib/groveAnthropic';
 import { streamText } from 'ai';
 import { getDb } from '@/lib/mongodb';
 import { doPaginatedVectorSearch } from '@/lib/utils';
@@ -44,7 +44,7 @@ Please use this context along with your knowledge to provide a comprehensive ans
   }
 
   const result = await streamText({
-    model: anthropic('claude-haiku-4-5-20251001'),
+    model: anthropic('claude-haiku-4-5'),
     system: `You are Claude, an expert AI assistant specializing in multimodal data analysis and conversational support.
 
 ## Project Context

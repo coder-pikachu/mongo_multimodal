@@ -3,9 +3,9 @@
  * Specialized agent for combining and synthesizing results from multiple agents
  */
 
+import { anthropic } from '../groveAnthropic';
 import { Agent } from './base.agent';
 import { AgentInput, AgentOutput } from '@/types/agent.types';
-import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 
@@ -243,7 +243,7 @@ Generate the report now:`;
 
     const result = await streamText({
       model: selectedProvider === 'claude'
-        ? anthropic('claude-haiku-4-5-20251001')
+        ? anthropic('claude-haiku-4-5')
         : openai('gpt-5-nano-2025-08-07'),
       maxOutputTokens: 8192,
       messages: [

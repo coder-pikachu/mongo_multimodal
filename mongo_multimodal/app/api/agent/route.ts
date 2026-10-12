@@ -1,4 +1,4 @@
-import { anthropic } from '@ai-sdk/anthropic';
+import { anthropic } from '../../lib/groveAnthropic';
 import { openai } from '@ai-sdk/openai';
 import { streamText, tool, stepCountIs } from 'ai';
 import { getDb } from '@/lib/mongodb';
@@ -115,7 +115,7 @@ async function analyzeImage(projectId: string, dataId: string, userQuery: string
 
     // Create a message with the image for Claude to analyze
     const analysisResult = await streamText({
-      model: selectedProvider === 'claude' ? anthropic('claude-haiku-4-5-20251001') : openai('gpt-5-nano-2025-08-07'),
+      model: selectedProvider === 'claude' ? anthropic('claude-haiku-4-5') : openai('gpt-5-nano-2025-08-07'),
       maxOutputTokens: 4096,
       messages: [
         {
@@ -402,7 +402,7 @@ export async function POST(req: Request) {
     let stepCounter = 0;
 
     const result = await streamText({
-      model: selectedProvider === 'claude' ? anthropic('claude-haiku-4-5-20251001') : openai('gpt-5-nano-2025-08-07'),
+      model: selectedProvider === 'claude' ? anthropic('claude-haiku-4-5') : openai('gpt-5-nano-2025-08-07'),
       maxOutputTokens: 8192,
       system: `You are Claude, an expert AI research assistant specializing in multimodal data analysis and research.
 

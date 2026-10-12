@@ -99,7 +99,42 @@ LANGCHAIN_PROJECT=mongo-multimodal             # Organize runs in LangSmith
 # Optional: Unstructured.io (for advanced document parsing)
 UNSTRUCTURED_API_URL=http://localhost:8000
 UNSTRUCTURED_API_KEY=                          # Leave empty for self-hosted
+
+
+
+
+Using Anthropic through Grove (optional)
+
+The default Anthropic setup uses an Anthropic API key. A Grove-issued key is not accepted by api.anthropic.com; to use Grove, configure the app's Anthropic provider to call the Grove endpoint and use the authentication method shown in your approved Grove request's Usage instructions.
+
+
+
+
+
+Request and obtain approved Anthropic/Claude access in Grove. Copy the endpoint, credential type, and model/deployment name from the request's Usage instructions.
+
+
+
+In the app directory (the directory containing package.json), add the Grove credential to .env.local using the environment-variable name expected by the provider configuration. For example, if the provider reads GROVE_API_KEY:
+
+ GROVE_API_KEY=your_grove_key
+
+
+
+Configure the Anthropic SDK provider to use the Grove endpoint and authentication header documented by Grove. Use the Grove deployment/model name from your request; it may differ from Anthropic's public model ID.
+
+
+
+Restart the development server after changing .env.local, then test an Anthropic-powered feature.
+
+Never commit .env.local or publish API credentials. Do not use a Grove key against Anthropic's direct API endpoint.
+
+
 ```
+
+
+
+
 
 ### 4. MongoDB Atlas Setup
 
@@ -536,7 +571,7 @@ LLM_FOR_ANALYSIS=openai
 ```
 
 Models used:
-- Claude: `claude-haiku-4-5-20251001`
+- Claude: `claude-haiku-4-5`
 - OpenAI: `gpt-5-nano-2025-08-07`
 
 ### Vector Search Strategies
